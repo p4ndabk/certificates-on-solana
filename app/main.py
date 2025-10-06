@@ -6,6 +6,7 @@ Ponto de entrada principal da aplicação FastAPI
 from fastapi import FastAPI, Form, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 import asyncio
 
 # Importações dos serviços
@@ -199,16 +200,68 @@ async def emitir_certificado_mvp(
         )
 
 
+# Endpoint alternativo que aceita JSON
+
+class CertificadoRequest(BaseModel):
+    nome_participante: str
+    evento: str = "Evento Geral"
+
+@app.post("/certificados/emitir-json")
+async def emitir_certificado_json(request: CertificadoRequest):
+    """
+    Emite um certificado autenticado na blockchain Solana (versão JSON).
+    
+    Args:
+        request (CertificadoRequest): Dados do certificado em JSON
+        
+    Returns:
+        Response: PDF do certificado com autenticação blockchain
+    """
+    
+    try:
+        # 1. Função de Hashing - gerar_hash_sha256
+        conteudo_certificado = f"Certificado para {request.nome_participante} - {request.evento}"
+        conteudo_bytes = conteudo_certificado.encode('utf-8')
+        certificado_hash = gerar_hash_sha256(conteudo_bytes)
+        
+        # 2. Função de Registro na Solana - registrar_hash_solana
+        txid_solana = await registrar_hash_solana(certificado_hash)
+        
+        # 3. Função de Geração de PDF - gerar_certificado_pdf
+        pdf_bytes = gerar_certificado_pdf(
+            hash_certificado=certificado_hash,
+            txid_solana=txid_solana,
+            nome_participante=request.nome_participante
+        )
+        
+        # 4. Endpoint FastAPI - Retorna Response com PDF
+        filename = f"certificado_{request.nome_participante.replace(' ', '_')}.pdf"
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao emitir certificado: {str(e)}"
+        )
+
+
 if __name__ == "__main__":
     import uvicorn
     
-    print(f"🚀 Iniciando {APP_NAME} v{APP_VERSION}")
-    print("📖 Documentação disponível em: http://localhost:8000/docs")
-    print("🏠 Página inicial: http://localhost:8000")
-    print("🔗 Solana Devnet Explorer: https://explorer.solana.com/?cluster=devnet")
+    print(f"Iniciando {APP_NAME} v{APP_VERSION}")
+    print("Documentação disponível em: http://localhost:8000/docs")
+    print("Página inicial: http://localhost:8000")
+    print("Solana Devnet Explorer: https://explorer.solana.com/?cluster=devnet")
     
     uvicorn.run(
-        "main:app",
+        "app.main:app",
         host="0.0.0.0",
         port=8000,
         reload=True,
