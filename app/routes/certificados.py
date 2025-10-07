@@ -68,8 +68,8 @@ async def registrar_certificado(request: CertificadoRequest):
                 "timestamp_unix": int(current_time.timestamp())
             },
             "blockchain": {
-                "rede": "Solana Testnet",
-                "explorer_url": f"https://explorer.solana.com/tx/{txid_solana}?cluster=testnet",
+                "rede": "Solana Devnet",
+                "explorer_url": f"https://explorer.solana.com/tx/{txid_solana}?cluster=devnet",
                 "verificacao_url": f"http://localhost:8000/certificados/verificar/{txid_solana}",
                 "memo_program": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
             },
