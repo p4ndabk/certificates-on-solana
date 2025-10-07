@@ -3,6 +3,7 @@ Rotas para registro de certificados na blockchain
 """
 
 import json
+import uuid
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
@@ -16,7 +17,8 @@ router = APIRouter(prefix="/certificados", tags=["certificados"])
 class CertificadoRequest(BaseModel):
     name: str
     event: str
-    time: int  # Horas de duração ou timestamp
+    document: str  # CPF ou documento de identificação
+    duration_hours: int  # Horas de duração do evento/curso
 
 
 @router.post("/registrar")
@@ -32,10 +34,16 @@ async def registrar_certificado(request: CertificadoRequest):
     """
     
     try:
+        certificate_uuid = str(uuid.uuid4())
+        current_time = datetime.now()
+        
         certificate_data = {
             "event": request.event, 
+            "uuid": certificate_uuid,
             "name": request.name,
-            "time": datetime.now().isoformat()
+            "document": request.document,
+            "duration_hours": request.duration_hours,
+            "time": current_time.isoformat()
         }
         
         json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)        
@@ -48,13 +56,16 @@ async def registrar_certificado(request: CertificadoRequest):
             "certificado": {
                 "event": request.event,
                 "name": request.name,
-                "time": request.time,
+                "document": request.document,
+                "uuid": certificate_uuid,
+                "time": current_time.isoformat(),
+                "duration_hours": request.duration_hours,  # Horas de duração do evento
                 "json_canonico": certificate_data,
                 "hash_sha256": certificado_hash,
                 "txid_solana": txid_solana,
                 "network": "testnet",
-                "timestamp": datetime.now().isoformat(),
-                "timestamp_unix": int(datetime.now().timestamp())
+                "timestamp": current_time.isoformat(),
+                "timestamp_unix": int(current_time.timestamp())
             },
             "blockchain": {
                 "rede": "Solana Testnet",
@@ -91,10 +102,14 @@ async def validar_hash_certificado(request: CertificadoRequest):
     """
     
     try:
+        current_time = datetime.now()
+        
         certificate_data = {
             "event": request.event,
             "name": request.name,
-            "time": request.time
+            "document": request.document,
+            "duration_hours": request.duration_hours,
+            "time": current_time.isoformat()
         }
         
         json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
@@ -104,6 +119,7 @@ async def validar_hash_certificado(request: CertificadoRequest):
         return {
             "status": "validacao_sucesso",
             "dados": certificate_data,
+            "duration_hours": request.duration_hours,
             "json_canonico": certificate_data,
             "json_canonico_string": json_canonico,
             "hash_sha256": certificado_hash,

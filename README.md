@@ -1,57 +1,56 @@
-# 🎓 Certificados na Solana
+# Sistema de Certificados na Blockchain Solana
 
-Sistema de emissão de certificados autenticados na blockchain Solana. Este MVP (Mínimo Produto Viável) demonstra como registrar a autenticidade de certificados PDF na blockchain de teste (Devnet) da Solana.
+Sistema profissional para emissão e verificação de certificados autenticados na blockchain Solana, com suporte para JSON canonizado e hashing SHA-256.
 
-## 🚀 Características
+## Características Principais
 
-- ✅ Emissão de certificados em PDF
-- ✅ Autenticação via blockchain Solana (Devnet)
-- ✅ Hash SHA-256 para integridade
-- ✅ API REST com FastAPI
-- ✅ Interface web interativa
-- ✅ Verificação de autenticidade
-- ✅ Documentação automática (Swagger UI)
+- Registro de certificados na blockchain Solana (testnet/mainnet)
+- JSON canonizado para garantir integridade de dados
+- Hash SHA-256 para verificação de autenticidade
+- API REST completa com FastAPI
+- Interface de documentação automática (Swagger)
+- Suporte para carteiras personalizadas do usuário
+- Modo simulação para desenvolvimento sem custos
 
-## 🏗️ Arquitetura
+## Arquitetura do Sistema
 
 ```
 certificates-on-solana/
 ├── app/
-│   ├── __init__.py
 │   ├── main.py              # Ponto de entrada da aplicação
-│   ├── config.py            # Configurações globais
+│   ├── config.py            # Configurações globais e logging
+│   ├── wallet_config.py     # Configurações de carteira
 │   ├── routes/
-│   │   ├── __init__.py
-│   │   └── certificados.py  # Rotas relacionadas aos certificados
+│   │   └── certificados.py  # Endpoints da API
 │   └── services/
-│       ├── __init__.py
 │       ├── blockchain.py    # Integração com Solana
-│       ├── pdf_generator.py # Geração de PDFs
-│       └── hashing.py       # Funções de hashing SHA-256
-├── requirements.txt
-├── README.md
-└── promp/
-    └── referencia.md        # Especificação original
+│       └── hashing.py       # Funções de hash SHA-256
+├── wallet/
+│   ├── README.md           # Guia de configuração de carteira
+│   └── .gitignore          # Proteção de arquivos sensíveis
+├── run.py                  # Script de execução
+└── requirements.txt        # Dependências Python
 ```
 
-## 🛠️ Tecnologias Utilizadas
+## Tecnologias Utilizadas
 
-- **Framework**: FastAPI
-- **Blockchain**: Solana (Devnet)
-- **Hashing**: SHA-256 (hashlib nativo)
-- **PDF**: fpdf2
-- **Servidor**: Uvicorn
+- **Framework Backend**: FastAPI
+- **Blockchain**: Solana (testnet/mainnet)
+- **Hashing**: SHA-256 nativo (hashlib)
+- **Servidor ASGI**: Uvicorn
+- **JSON**: Canonização com ordenação de chaves
+- **Logging**: Sistema estruturado de logs
 
-## 📦 Instalação
+## Instalação e Configuração
 
-### 1. Clonar o repositório
+### 1. Clonar o Repositório
 
 ```bash
 git clone <url-do-repositorio>
 cd certificates-on-solana
 ```
 
-### 2. Criar ambiente virtual (recomendado)
+### 2. Ambiente Virtual (Recomendado)
 
 ```bash
 python -m venv venv
@@ -60,171 +59,196 @@ python -m venv venv
 source venv/bin/activate
 
 # Windows
-venv\\Scripts\\activate
+venv\Scripts\activate
 ```
 
-### 3. Instalar dependências
+### 3. Instalar Dependências
 
 ```bash
 pip install -r requirements.txt
+
+# Para funcionalidade completa da blockchain (opcional):
+pip install solana solders
 ```
 
-### 4. Executar a aplicação
+### 4. Executar a Aplicação
 
 ```bash
-# Executar a partir da raiz do projeto
-python -m app.main
+# Método recomendado
+python run.py
 
-# Ou usando uvicorn diretamente
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Alternativo com uvicorn
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## 🌐 Uso da API
+## Uso da API
 
-### Interface Web
-Acesse: `http://localhost:8000`
-
-### Documentação Interativa
-- **Swagger UI**: `http://localhost:8000/docs`
-- **ReDoc**: `http://localhost:8000/redoc`
+### Interface de Documentação
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
 
 ### Endpoints Principais
 
-#### 1. Emitir Certificado
+#### Registrar Certificado
 ```bash
-POST /certificados/emitir
+POST /certificados/registrar
+Content-Type: application/json
+
+{
+  "name": "João Silva",
+  "event": "Curso de Python",
+  "document": "12345678901",
+  "duration_hours": 40
+}
 ```
 
-**Parâmetros** (form-data):
-- `nome_participante` (obrigatório): Nome do participante
-- `evento` (opcional): Nome do evento/curso
-
-**Exemplo com curl**:
+#### Validar Hash (sem registrar)
 ```bash
-curl -X POST "http://localhost:8000/certificados/emitir" \
-     -H "Content-Type: application/x-www-form-urlencoded" \
-     -d "nome_participante=João Silva&evento=Workshop Blockchain" \
-     --output certificado.pdf
+POST /certificados/validar-hash
+Content-Type: application/json
+
+{
+  "name": "João Silva",
+  "event": "Curso de Python", 
+  "document": "12345678901",
+  "duration_hours": 40
+}
 ```
 
-#### 2. Verificar Certificado
+#### Verificar Transação
 ```bash
-POST /certificados/verificar
+GET /certificados/verificar/{txid}
 ```
 
-**Parâmetros** (form-data):
-- `txid` (obrigatório): Transaction ID da Solana
-
-**Exemplo**:
+#### Informações da Carteira
 ```bash
-curl -X POST "http://localhost:8000/certificados/verificar" \
-     -H "Content-Type: application/x-www-form-urlencoded" \
-     -d "txid=abc123def456..."
+GET /certificados/wallet-info
 ```
 
-#### 3. Informações da Rede
+### Exemplo com cURL
+
 ```bash
-GET /certificados/info-rede
+curl -X POST "http://localhost:8000/certificados/registrar" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "David Richard",
+       "event": "PythonFloripa",
+       "document": "08625455956", 
+       "duration_hours": 5
+     }'
 ```
 
-#### 4. Hash de Exemplo
-```bash
-GET /certificados/hash-exemplo?texto=meu-texto
+## JSON Canonizado
+
+O sistema usa JSON canonizado para garantir hashes consistentes:
+
+1. **Ordenação alfabética** de chaves
+2. **Separadores compactos** (`,` e `:`)
+3. **Sem espaços em branco** extras
+4. **UTF-8 sem escape** para caracteres especiais
+
+### Exemplo de JSON Canonizado:
+```json
+{"document":"08625455956","duration_hours":5,"event":"PythonFloripa","name":"David Richard","time":"2025-10-07T15:30:45.123456","uuid":"550e8400-e29b-41d4-a716-446655440000"}
 ```
 
-## 🔧 Funcionalidades Implementadas
+## Configuração de Carteira
 
-### 1. Função de Hashing (`gerar_hash_sha256`)
-- Localização: `app/services/hashing.py`
-- Recebe conteúdo em bytes
-- Retorna hash SHA-256 em formato hexadecimal
+O sistema **nunca cria carteiras automaticamente** por motivos de segurança. Consulte o [Guia de Carteira](wallet/README.md) para configuração manual.
 
-### 2. Função de Registro na Solana (`registrar_hash_solana`)
-- Localização: `app/services/blockchain.py`
-- Conecta à Solana Devnet
-- Registra hash usando MemoProgram (simulado no MVP)
-- Retorna Transaction ID (TXID)
+### Modos de Operação
 
-### 3. Função de Geração de PDF (`gerar_certificado_pdf`)
-- Localização: `app/services/pdf_generator.py`
-- Usa biblioteca fpdf2
-- Inclui hash e TXID no certificado
-- Retorna conteúdo binário do PDF
+1. **Modo Simulação** (padrão): Sem custos, sem transações reais
+2. **Modo Real**: Requer carteira configurada e SOL
 
-### 4. Endpoint FastAPI (`/certificados/emitir`)
-- Localização: `app/routes/certificados.py` e `app/main.py`
-- Aceita parâmetro `nome_participante`
-- Retorna Response HTTP com PDF
-- Media type: `application/pdf`
+## Verificação de Certificados
 
-## 🧪 Como Funciona o Processo
+Cada certificado registrado contém:
 
-1. **Recepção**: API recebe nome do participante
-2. **Hashing**: Gera hash SHA-256 do conteúdo do certificado
-3. **Blockchain**: Registra hash na Solana Devnet (simulado)
-4. **PDF**: Gera certificado PDF com hash e TXID
-5. **Resposta**: Retorna PDF como download
+- **Hash SHA-256**: Integridade dos dados
+- **TXID Solana**: Prova de registro na blockchain  
+- **UUID único**: Identificador do certificado
+- **Timestamp**: Data/hora de emissão
+- **Metadados**: Nome, evento, documento, duração
 
-## 🔍 Verificação de Autenticidade
+### Validação Manual
 
-Cada certificado contém:
-- **Hash SHA-256**: Garante integridade do conteúdo
-- **TXID Solana**: Comprova registro na blockchain
-- **Link Explorer**: Para verificação manual na rede
+```bash
+# Gerar hash do JSON canonizado
+printf '{"document":"123","duration_hours":5,"event":"Evento","name":"Nome","time":"2025-10-07T...","uuid":"..."}' | shasum -a 256
+```
 
-## ⚠️ Nota sobre MVP
+## Logs e Monitoramento
 
-Este é um MVP para demonstração. Em produção seria necessário:
+O sistema inclui logging estruturado:
 
-1. **Chaves Privadas**: Configurar adequadamente as keypairs
-2. **Financiamento**: Airdrop ou financiamento de contas de teste
-3. **Biblioteca Solana**: Instalar `solana-py` e `solders`
-4. **Segurança**: Implementar autenticação e autorização
-5. **Persistência**: Banco de dados para armazenar metadados
-6. **Monitoramento**: Logs e métricas de produção
+```python
+# Configuração em app/config.py
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+```
 
-## 🌍 Solana Devnet
+## Segurança
 
-- **URL**: https://api.devnet.solana.com
-- **Explorer**: https://explorer.solana.com/?cluster=devnet
-- **Faucet**: https://faucet.solana.com/
+- **Carteiras controladas pelo usuário**: Sistema nunca gerencia chaves privadas
+- **Arquivos protegidos**: .gitignore previne commits acidentais
+- **Logs sem dados sensíveis**: Informações críticas não são logadas
+- **Validação de entrada**: Todos os inputs são validados
 
-## 🐛 Resolução de Problemas
+## Solução de Problemas
 
-### Erro de importação das bibliotecas Solana
-Se você encontrar erros de importação, instale as dependências corretas:
-
+### Bibliotecas Solana não encontradas
 ```bash
 pip install solana solders
 ```
 
-### Erro na geração de PDF
-Verifique se o fpdf2 está instalado:
-
-```bash
-pip install fpdf2
-```
-
-### Erro de porta em uso
-Mude a porta no arquivo `main.py` ou termine processos na porta 8000:
-
+### Porta em uso
 ```bash
 # Linux/Mac
 lsof -ti:8000 | xargs kill -9
 
-# Windows
+# Windows  
 netstat -ano | findstr :8000
 taskkill /PID <PID> /F
 ```
 
-## 📝 Logs e Debug
+### Erro de carteira
+Consulte o [Guia de Carteira](wallet/README.md) para configuração correta.
 
-Para debug, verifique os logs no terminal onde a aplicação está rodando. O FastAPI fornece logs detalhados de todas as requisições.
+## Desenvolvimento
 
-## 🤝 Contribuição
+### Estrutura de Códigos
+
+- `app/main.py`: Configuração FastAPI e rotas
+- `app/services/blockchain.py`: Lógica de integração Solana
+- `app/services/hashing.py`: Funções de hash SHA-256
+- `app/routes/certificados.py`: Endpoints da API
+- `app/config.py`: Configurações e logging
+
+### Contribuição
 
 1. Fork o projeto
 2. Crie uma branch para sua feature
+3. Implemente testes se necessário
+4. Faça commit das mudanças
+5. Abra um Pull Request
+
+## Licença
+
+Este projeto está sob licença MIT. Consulte o arquivo LICENSE para detalhes.
+
+## Suporte
+
+Para dúvidas ou problemas:
+- Abra uma issue no GitHub
+- Consulte a documentação em `/docs`
+- Verifique os logs da aplicação
+
+---
+
+**Sistema desenvolvido com FastAPI e integração blockchain Solana**
 3. Commit suas mudanças
 4. Push para a branch
 5. Abra um Pull Request
