@@ -32,30 +32,24 @@ async def registrar_certificado(request: CertificadoRequest):
     """
     
     try:
-        # 1. Criar JSON canonizado (determinístico) - ordem alfabética
         certificate_data = {
-            "event": request.event,  # Alfabeticamente: event
-            "name": request.name,    # name
-            "time": request.time     # time
+            "event": request.event, 
+            "name": request.name,
+            "time": datetime.now().isoformat()
         }
         
-        # JSON canonizado: ordenado, sem espaços, sem unicode escape
-        json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
-        
-        # 2. Gerar hash SHA-256 do JSON canonizado
+        json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)        
         certificado_hash = gerar_hash_texto(json_canonico)
         
-        # 3. Registrar hash na blockchain Solana
         txid_solana = await registrar_hash_solana(certificado_hash, request.name, request.event)
         
-        # 4. Retornar dados JSON com informações de validação
         return {
             "status": "sucesso",
             "certificado": {
-                "event": request.event,  # Ordem alfabética: event primeiro
-                "name": request.name,    # Depois name
-                "time": request.time,    # Depois time
-                "json_canonico": certificate_data,  # Retorna como objeto, não string
+                "event": request.event,
+                "name": request.name,
+                "time": request.time,
+                "json_canonico": certificate_data,
                 "hash_sha256": certificado_hash,
                 "txid_solana": txid_solana,
                 "network": "testnet",
@@ -83,91 +77,6 @@ async def registrar_certificado(request: CertificadoRequest):
         )
 
 
-@router.post("/debug-hash")
-async def debug_hash_certificado(request: CertificadoRequest):
-    """
-    Debug detalhado do processo de hash para verificar problemas.
-    
-    Args:
-        request (CertificadoRequest): Dados do certificado
-        
-    Returns:
-        dict: Informações detalhadas do processo de hash
-    """
-    
-    try:
-        # 1. Criar JSON canonizado (determinístico) - ordem alfabética
-        certificate_data = {
-            "event": request.event,  # Alfabeticamente: event
-            "name": request.name,    # name
-            "time": request.time     # time
-        }
-        
-        # JSON canonizado: ordenado, sem espaços, sem unicode escape
-        json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
-        
-        # 2. Informações detalhadas
-        bytes_data = json_canonico.encode('utf-8')
-        
-        # 3. Gerar hash SHA-256 do JSON canonizado
-        certificado_hash = gerar_hash_texto(json_canonico)
-        
-        return {
-            "status": "debug_sucesso",
-            "json_canonico": json_canonico,
-            "json_escaped": json_canonico.replace('"', '\\"'),
-            "bytes_length": len(bytes_data),
-            "bytes_repr": repr(bytes_data),
-            "bytes_hex": bytes_data.hex(),
-            "hash_sha256": certificado_hash,
-            "para_site_externo": {
-                "texto_para_copiar": json_canonico,
-                "comprimento_caracteres": len(json_canonico),
-                "hash_esperado": certificado_hash
-            }
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erro ao debuggar hash: {str(e)}"
-        )
-
-
-@router.post("/json-canonico")
-async def obter_json_canonico(request: CertificadoRequest):
-    """
-    Retorna apenas o JSON canonizado para testes manuais.
-    
-    Args:
-        request (CertificadoRequest): Dados do certificado
-        
-    Returns:
-        str: JSON canonizado puro
-    """
-    
-    try:
-        # Criar JSON canonizado (determinístico) - ordem alfabética
-        certificate_data = {
-            "event": request.event,  # Alfabeticamente: event
-            "name": request.name,    # name
-            "time": request.time     # time
-        }
-        
-        # JSON canonizado: ordenado, sem espaços, sem unicode escape
-        json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
-        
-        # Retornar como texto puro
-        from fastapi.responses import PlainTextResponse
-        return PlainTextResponse(content=json_canonico, media_type="text/plain")
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erro ao gerar JSON canonizado: {str(e)}"
-        )
-
-
 @router.post("/validar-hash")
 async def validar_hash_certificado(request: CertificadoRequest):
     """
@@ -182,24 +91,21 @@ async def validar_hash_certificado(request: CertificadoRequest):
     """
     
     try:
-        # 1. Criar JSON canonizado (determinístico) - ordem alfabética
         certificate_data = {
-            "event": request.event,  # Alfabeticamente: event
-            "name": request.name,    # name
-            "time": request.time     # time
+            "event": request.event,
+            "name": request.name,
+            "time": request.time
         }
         
-        # JSON canonizado: ordenado, sem espaços, sem unicode escape
         json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
         
-        # 2. Gerar hash SHA-256 do JSON canonizado
         certificado_hash = gerar_hash_texto(json_canonico)
         
         return {
             "status": "validacao_sucesso",
             "dados": certificate_data,
-            "json_canonico": certificate_data,  # Objeto limpo
-            "json_canonico_string": json_canonico,  # String para hash
+            "json_canonico": certificate_data,
+            "json_canonico_string": json_canonico,
             "hash_sha256": certificado_hash,
             "instrucoes": {
                 "validacao_manual": f"printf '{json_canonico}' | shasum -a 256",
@@ -287,7 +193,6 @@ async def obter_informacoes_carteira():
         
         wallet_address = str(_registry.keypair.pubkey())
         
-        # Verificar saldo se usando transações reais
         if USE_REAL_TRANSACTIONS and _registry.client:
             try:
                 balance_response = _registry.client.get_balance(_registry.keypair.pubkey())

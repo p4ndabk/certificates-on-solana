@@ -7,10 +7,14 @@ import secrets
 import time
 import json
 import os
+import logging
 from typing import Optional
 from pathlib import Path
 from ..config import SOLANA_DEVNET_URL
 from ..wallet_config import USE_REAL_TRANSACTIONS, WALLET_PATH, RPC_URL, ACTIVE_NETWORK, WALLET_CONFIGURED, REQUIRE_MANUAL_SETUP
+
+# Configurar logging
+logger = logging.getLogger(__name__)
 
 # Importações condicionais para Solana
 try:
@@ -24,8 +28,7 @@ try:
     SOLANA_AVAILABLE = True
 except ImportError:
     SOLANA_AVAILABLE = False
-    print("⚠️  Bibliotecas Solana não instaladas. Executando em modo simulação.")
-    print("📦 Para funcionalidade completa, execute: pip install solana solders")
+    logger.warning("Bibliotecas Solana não instaladas. Executando em modo simulação.")
 
 
 class SolanaCertificateRegistry:
@@ -35,27 +38,25 @@ class SolanaCertificateRegistry:
     MEMO_PROGRAM_ID = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
     
     def __init__(self):
-        # Configuração dinâmica baseada no modo
+        """Inicializa o registro de certificados Solana"""
         self.network = ACTIVE_NETWORK
         self.rpc_url = RPC_URL
         self.use_real_transactions = USE_REAL_TRANSACTIONS
         
         if REQUIRE_MANUAL_SETUP and not WALLET_CONFIGURED:
-            print("⚠️  CARTEIRA NÃO CONFIGURADA")
-            print("   O usuário deve configurar sua própria carteira")
-            print("   Execute modo simulação até configurar")
+            logger.warning("Carteira não configurada - usuário deve configurar manualmente")
             self.client = None
             self.keypair = None
         elif SOLANA_AVAILABLE and self.use_real_transactions and WALLET_CONFIGURED:
-            print(f"🔗 Conectando à Solana {self.network.upper()}")
+            logger.info(f"Conectando à Solana {self.network.upper()}")
             self.client = Client(self.rpc_url)
             self.keypair = self._load_wallet()
         elif SOLANA_AVAILABLE:
-            print(f"🔄 Modo simulação com bibliotecas Solana ({self.network})")
+            logger.info(f"Modo simulação com bibliotecas Solana ({self.network})")
             self.client = Client(self.rpc_url) if not REQUIRE_MANUAL_SETUP else None
             self.keypair = Keypair() if not REQUIRE_MANUAL_SETUP else None
         else:
-            print(f"⚠️  Modo simulação completa ({self.network})")
+            logger.info(f"Modo simulação completa ({self.network})")
             self.client = None
             self.keypair = None
     
@@ -65,13 +66,13 @@ class SolanaCertificateRegistry:
             return None
             
         try:
-            print(f"📁 Carregando carteira de {WALLET_PATH}")
+            logger.info(f"Carregando carteira de {WALLET_PATH}")
             with open(WALLET_PATH, 'r') as f:
                 keypair_data = json.load(f)
                 return Keypair.from_bytes(bytes(keypair_data))
                 
         except Exception as e:
-            print(f"❌ Erro ao carregar carteira: {e}")
+            logger.error(f"Erro ao carregar carteira: {e}")
             return None
     
     def create_certificate_metadata(self, certificado_hash: str, nome_participante: str, evento: str = "Evento Geral") -> dict:
@@ -92,9 +93,9 @@ class SolanaCertificateRegistry:
         """Registra o certificado na blockchain Solana real"""
         
         if not SOLANA_AVAILABLE:
-            raise Exception("Bibliotecas Solana não disponíveis. Execute: pip install solana solders")
+            raise Exception("Bibliotecas Solana não disponíveis")
         
-        print(f"🚀 Registrando certificado na Solana Testnet...")
+        logger.info("Registrando certificado na Solana")
         
         try:
             # 1. Criar metadados do certificado
@@ -115,7 +116,7 @@ class SolanaCertificateRegistry:
                 }
                 memo_data = json.dumps(compact_metadata, separators=(',', ':'))
             
-            print(f"📝 Tamanho do memo: {len(memo_data.encode('utf-8'))} bytes")
+            logger.debug(f"Tamanho do memo: {len(memo_data.encode('utf-8'))} bytes")
             
             # 4. Criar instrução de memo
             memo_bytes = memo_data.encode('utf-8')
@@ -153,41 +154,31 @@ class SolanaCertificateRegistry:
             hash_prefix = certificado_hash[:8]
             simulated_tx = f"{hash_prefix}{secrets.token_hex(24)}{timestamp[-4:]}"
             
-            print(f"✅ Certificado registrado! (Modo demonstração)")
-            print(f"🔗 TXID: {simulated_tx}")
-            print(f"📄 Hash: {certificado_hash}")
-            print(f"👤 Participante: {nome_participante}")
+            logger.info(f"Certificado registrado - TXID: {simulated_tx}")
             
             return simulated_tx
             
         except Exception as e:
-            print(f"❌ Erro no registro: {e}")
+            logger.error(f"Erro no registro: {e}")
             raise Exception(f"Falha ao registrar na Solana: {str(e)}")
     
     async def register_simulated(self, certificado_hash: str, nome_participante: str, evento: str = "Evento Geral") -> str:
         """Registra o certificado em modo simulação"""
         
-        print(f"🔄 Modo simulação - Registrando certificado...")
+        logger.info("Registrando certificado em modo simulação")
         
         # Simular delay de rede
         await asyncio.sleep(0.5)
         
-        # Criar metadados
         metadata = self.create_certificate_metadata(certificado_hash, nome_participante, evento)
         
-        # Para demonstração, gerar TXID simulado mais realista
-        # usando um formato que seria válido na mainnet
         timestamp = str(int(time.time()))
         hash_prefix = certificado_hash[:8]
         
-        # Gerar TXID simulado mas com formato válido para mainnet
         simulated_tx = f"{hash_prefix}{secrets.token_hex(24)}{timestamp[-4:]}"
         
-        print(f"📝 Metadados criados: {json.dumps(metadata, indent=2)}")
-        print(f"✅ Certificado registrado! (Simulação)")
-        print(f"🔗 TXID simulado: {simulated_tx}")
-        print(f"🌐 Explorer (simulado): https://explorer.solana.com/tx/{simulated_tx}")
-        print(f"⚠️  NOTA: Para verificação real, seria necessário SOL na mainnet")
+        logger.debug(f"Metadados criados: {json.dumps(metadata, indent=2)}")
+        logger.info(f"Certificado registrado - TXID simulado: {simulated_tx}")
         
         return simulated_tx
 
@@ -218,7 +209,7 @@ async def registrar_hash_solana(certificado_hash: str, nome_participante: str = 
             return await _registry.register_simulated(certificado_hash, nome_participante, evento)
             
     except Exception as e:
-        print(f"⚠️  Erro no registro, usando fallback: {e}")
+        logger.warning(f"Erro no registro, usando fallback: {e}")
         return await _registry.register_simulated(certificado_hash, nome_participante, evento)
 
 
@@ -251,7 +242,7 @@ async def verificar_transacao(txid: str) -> Optional[dict]:
             # except:
             #     pass
             
-            print(f"🔍 Verificando TXID: {txid}")
+            logger.debug(f"Verificando TXID: {txid}")
         
         # Simulação de verificação
         return {
@@ -264,7 +255,7 @@ async def verificar_transacao(txid: str) -> Optional[dict]:
         }
         
     except Exception as e:
-        print(f"Erro ao verificar transação: {str(e)}")
+        logger.error(f"Erro ao verificar transação: {str(e)}")
         return None
 
 
