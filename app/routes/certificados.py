@@ -1,101 +1,242 @@
 """
-Rotas para emissão e gerenciamento de certificados
+Rotas para registro de certificados na blockchain
 """
 
-from fastapi import APIRouter, Form, HTTPException, Response
-from fastapi.responses import JSONResponse
-from typing import Optional
-import asyncio
+import json
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from datetime import datetime
 
 from ..services.hashing import gerar_hash_texto
 from ..services.blockchain import registrar_hash_solana, verificar_transacao, obter_info_rede
-from ..services.pdf_generator import gerar_certificado_pdf
 
 router = APIRouter(prefix="/certificados", tags=["certificados"])
 
 
-@router.post("/emitir")
-async def emitir_certificado(
-    nome_participante: str = Form(..., description="Nome do participante"),
-    evento: str = Form(default="Evento Geral", description="Nome do evento/curso")
-):
+class CertificadoRequest(BaseModel):
+    name: str
+    event: str
+    time: int  # Horas de duração ou timestamp
+
+
+@router.post("/registrar")
+async def registrar_certificado(request: CertificadoRequest):
     """
-    Emite um certificado autenticado na blockchain Solana.
+    Registra um certificado na blockchain Solana usando JSON canonizado.
     
     Args:
-        nome_participante (str): Nome do participante
-        evento (str): Nome do evento/curso
+        request (CertificadoRequest): Dados do certificado
         
     Returns:
-        Response: PDF do certificado com autenticação blockchain
+        dict: Dados do certificado registrado com TXID da blockchain
     """
     
     try:
-        # 1. Gerar conteúdo do certificado para hash
-        conteudo_certificado = f"Certificado para {nome_participante} - {evento}"
+        # 1. Criar JSON canonizado (determinístico) - ordem alfabética
+        certificate_data = {
+            "event": request.event,  # Alfabeticamente: event
+            "name": request.name,    # name
+            "time": request.time     # time
+        }
         
-        # 2. Gerar hash SHA-256 do conteúdo
-        certificado_hash = gerar_hash_texto(conteudo_certificado)
+        # JSON canonizado: ordenado, sem espaços, sem unicode escape
+        json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
+        
+        # 2. Gerar hash SHA-256 do JSON canonizado
+        certificado_hash = gerar_hash_texto(json_canonico)
         
         # 3. Registrar hash na blockchain Solana
-        txid_solana = await registrar_hash_solana(certificado_hash)
+        txid_solana = await registrar_hash_solana(certificado_hash, request.name, request.event)
         
-        # 4. Gerar PDF do certificado
-        pdf_bytes = gerar_certificado_pdf(
-            hash_certificado=certificado_hash,
-            txid_solana=txid_solana,
-            nome_participante=nome_participante
-        )
-        
-        # 5. Retornar PDF como resposta
-        filename = f"certificado_{nome_participante.replace(' ', '_')}.pdf"
-        
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f"attachment; filename={filename}"
+        # 4. Retornar dados JSON com informações de validação
+        return {
+            "status": "sucesso",
+            "certificado": {
+                "event": request.event,  # Ordem alfabética: event primeiro
+                "name": request.name,    # Depois name
+                "time": request.time,    # Depois time
+                "json_canonico": certificate_data,  # Retorna como objeto, não string
+                "hash_sha256": certificado_hash,
+                "txid_solana": txid_solana,
+                "network": "testnet",
+                "timestamp": datetime.now().isoformat(),
+                "timestamp_unix": int(datetime.now().timestamp())
+            },
+            "blockchain": {
+                "rede": "Solana Testnet",
+                "explorer_url": f"https://explorer.solana.com/tx/{txid_solana}?cluster=testnet",
+                "verificacao_url": f"http://localhost:8000/certificados/verificar/{txid_solana}",
+                "memo_program": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
+            },
+            "validacao": {
+                "como_validar": "Recrie o JSON canonizado e compare o hash SHA-256",
+                "json_canonico_string": json_canonico,  # String para validação manual
+                "hash_esperado": certificado_hash,
+                "comando_validacao": f"printf '{json_canonico}' | shasum -a 256"
             }
-        )
+        }
         
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Erro ao emitir certificado: {str(e)}"
+            detail=f"Erro ao registrar certificado: {str(e)}"
         )
 
 
-@router.post("/verificar")
-async def verificar_certificado(
-    txid: str = Form(..., description="Transaction ID da Solana")
-):
+@router.post("/debug-hash")
+async def debug_hash_certificado(request: CertificadoRequest):
     """
-    Verifica a autenticidade de um certificado usando o TXID da Solana.
+    Debug detalhado do processo de hash para verificar problemas.
     
     Args:
-        txid (str): Transaction ID da transação na Solana
+        request (CertificadoRequest): Dados do certificado
         
     Returns:
-        dict: Informações sobre a verificação do certificado
+        dict: Informações detalhadas do processo de hash
     """
     
     try:
-        # Verificar transação na blockchain
-        info_transacao = await verificar_transacao(txid)
+        # 1. Criar JSON canonizado (determinístico) - ordem alfabética
+        certificate_data = {
+            "event": request.event,  # Alfabeticamente: event
+            "name": request.name,    # name
+            "time": request.time     # time
+        }
         
-        if info_transacao:
+        # JSON canonizado: ordenado, sem espaços, sem unicode escape
+        json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
+        
+        # 2. Informações detalhadas
+        bytes_data = json_canonico.encode('utf-8')
+        
+        # 3. Gerar hash SHA-256 do JSON canonizado
+        certificado_hash = gerar_hash_texto(json_canonico)
+        
+        return {
+            "status": "debug_sucesso",
+            "json_canonico": json_canonico,
+            "json_escaped": json_canonico.replace('"', '\\"'),
+            "bytes_length": len(bytes_data),
+            "bytes_repr": repr(bytes_data),
+            "bytes_hex": bytes_data.hex(),
+            "hash_sha256": certificado_hash,
+            "para_site_externo": {
+                "texto_para_copiar": json_canonico,
+                "comprimento_caracteres": len(json_canonico),
+                "hash_esperado": certificado_hash
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao debuggar hash: {str(e)}"
+        )
+
+
+@router.post("/json-canonico")
+async def obter_json_canonico(request: CertificadoRequest):
+    """
+    Retorna apenas o JSON canonizado para testes manuais.
+    
+    Args:
+        request (CertificadoRequest): Dados do certificado
+        
+    Returns:
+        str: JSON canonizado puro
+    """
+    
+    try:
+        # Criar JSON canonizado (determinístico) - ordem alfabética
+        certificate_data = {
+            "event": request.event,  # Alfabeticamente: event
+            "name": request.name,    # name
+            "time": request.time     # time
+        }
+        
+        # JSON canonizado: ordenado, sem espaços, sem unicode escape
+        json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
+        
+        # Retornar como texto puro
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(content=json_canonico, media_type="text/plain")
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao gerar JSON canonizado: {str(e)}"
+        )
+
+
+@router.post("/validar-hash")
+async def validar_hash_certificado(request: CertificadoRequest):
+    """
+    Valida o hash de um certificado sem registrar na blockchain.
+    Útil para verificar se os dados geram o hash esperado.
+    
+    Args:
+        request (CertificadoRequest): Dados do certificado
+        
+    Returns:
+        dict: Hash gerado e JSON canonizado
+    """
+    
+    try:
+        # 1. Criar JSON canonizado (determinístico) - ordem alfabética
+        certificate_data = {
+            "event": request.event,  # Alfabeticamente: event
+            "name": request.name,    # name
+            "time": request.time     # time
+        }
+        
+        # JSON canonizado: ordenado, sem espaços, sem unicode escape
+        json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
+        
+        # 2. Gerar hash SHA-256 do JSON canonizado
+        certificado_hash = gerar_hash_texto(json_canonico)
+        
+        return {
+            "status": "validacao_sucesso",
+            "dados": certificate_data,
+            "json_canonico": certificate_data,  # Objeto limpo
+            "json_canonico_string": json_canonico,  # String para hash
+            "hash_sha256": certificado_hash,
+            "instrucoes": {
+                "validacao_manual": f"printf '{json_canonico}' | shasum -a 256",
+                "validacao_python": f"import hashlib; hashlib.sha256('{json_canonico}'.encode()).hexdigest()"
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao validar hash: {str(e)}"
+        )
+
+
+@router.get("/verificar/{txid}")
+async def verificar_certificado(txid: str):
+    """
+    Verifica um certificado na blockchain Solana.
+    
+    Args:
+        txid (str): Transaction ID da Solana
+        
+    Returns:
+        dict: Status da verificação
+    """
+    
+    try:
+        resultado = await verificar_transacao(txid)
+        
+        if resultado:
             return {
-                "status": "válido",
-                "certificado_autenticado": True,
-                "txid": txid,
-                "informacoes": info_transacao,
-                "mensagem": "Certificado autenticado com sucesso na blockchain Solana"
+                "status": "encontrado",
+                "transacao": resultado
             }
         else:
             return {
-                "status": "inválido",
-                "certificado_autenticado": False,
-                "txid": txid,
+                "status": "nao_encontrado",
                 "mensagem": "Transação não encontrada na blockchain"
             }
             
@@ -126,35 +267,4 @@ async def obter_informacoes_rede():
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao obter informações da rede: {str(e)}"
-        )
-
-
-@router.get("/hash-exemplo")
-async def gerar_hash_exemplo(
-    texto: str = "Texto de exemplo para gerar hash"
-):
-    """
-    Gera um hash SHA-256 de exemplo para demonstração.
-    
-    Args:
-        texto (str): Texto para gerar o hash
-        
-    Returns:
-        dict: Hash gerado e informações
-    """
-    
-    try:
-        hash_gerado = gerar_hash_texto(texto)
-        
-        return {
-            "texto_original": texto,
-            "hash_sha256": hash_gerado,
-            "algoritmo": "SHA-256",
-            "tamanho_hash": len(hash_gerado)
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erro ao gerar hash: {str(e)}"
         )
