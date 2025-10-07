@@ -1,6 +1,3 @@
-# Configuração de Carteira Solana Real
-# IMPORTANTE: O usuário deve configurar sua própria carteira!
-
 import os
 from pathlib import Path
 

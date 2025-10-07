@@ -128,35 +128,69 @@ class SolanaCertificateRegistry:
                 data=memo_bytes
             )
             
-            # 5. SIMULAÇÃO para demonstração
-            # Em produção real, descomente as linhas abaixo:
-            
-            # # Obter recent blockhash
-            # recent_blockhash_response = self.client.get_latest_blockhash()
-            # recent_blockhash = recent_blockhash_response.value.blockhash
-            
-            # # Criar e assinar transação
-            # message = MessageV0.try_compile(
-            #     payer=self.keypair.pubkey(),
-            #     instructions=[instruction],
-            #     address_lookup_table_accounts=[],
-            #     recent_blockhash=recent_blockhash
-            # )
-            
-            # transaction = Transaction([self.keypair], message)
-            
-            # # Enviar transação
-            # response = self.client.send_transaction(transaction)
-            # tx_signature = str(response.value)
-            
-            # Para demonstração, gerar TXID simulado mas mais realista
-            timestamp = str(int(time.time()))
-            hash_prefix = certificado_hash[:8]
-            simulated_tx = f"{hash_prefix}{secrets.token_hex(24)}{timestamp[-4:]}"
-            
-            logger.info(f"Certificado registrado - TXID: {simulated_tx}")
-            
-            return simulated_tx
+            # 5. REGISTRO REAL NA BLOCKCHAIN - Versão Simplificada
+            try:
+                # Criar instrução de memo simples
+                from solana.transaction import Transaction as SolanaTransaction
+                from solana.message import Message
+                
+                # Obter recent blockhash
+                recent_blockhash_response = self.client.get_latest_blockhash()
+                recent_blockhash = recent_blockhash_response.value.blockhash
+                
+                # Criar transação usando API mais estável
+                transaction = SolanaTransaction(
+                    fee_payer=self.keypair.pubkey(),
+                    instructions=[instruction],
+                    recent_blockhash=recent_blockhash
+                )
+                
+                # Assinar transação
+                transaction.sign(self.keypair)
+                
+                # Enviar transação
+                response = self.client.send_transaction(transaction)
+                tx_signature = str(response.value)
+                
+                logger.info(f"Transação REAL enviada - TXID: {tx_signature}")
+                return tx_signature
+                
+            except Exception as e:
+                logger.error(f"Erro na transação real: {e}")
+                # Se falhar, usar solders como fallback
+                try:
+                    # Fallback usando solders
+                    recent_blockhash_response = self.client.get_latest_blockhash()
+                    recent_blockhash = recent_blockhash_response.value.blockhash
+                    
+                    # Usar VersionedTransaction
+                    from solders.transaction import VersionedTransaction
+                    from solders.message import MessageV0
+                    
+                    message = MessageV0.try_compile(
+                        payer=self.keypair.pubkey(),
+                        instructions=[instruction],
+                        address_lookup_table_accounts=[],
+                        recent_blockhash=recent_blockhash
+                    )
+                    
+                    transaction = VersionedTransaction(message, [self.keypair])
+                    
+                    # Enviar transação
+                    response = self.client.send_transaction(transaction)
+                    tx_signature = str(response.value)
+                    
+                    logger.info(f"Transação enviada (solders) - TXID: {tx_signature}")
+                    return tx_signature
+                    
+                except Exception as e2:
+                    logger.error(f"Ambos métodos falharam: {e2}")
+                    raise Exception(f"Falha na transação: {str(e)} | Fallback: {str(e2)}")
+                
+            except Exception as e:
+                logger.error(f"Erro na transação real: {e}")
+                # REMOVIDO O FALLBACK - vamos ver o erro real
+                raise Exception(f"Falha na transação real: {str(e)}")
             
         except Exception as e:
             logger.error(f"Erro no registro: {e}")
@@ -320,9 +354,13 @@ async def registrar_hash_solana(certificado_hash: str, nome_participante: str = 
     """
     
     try:
-        if SOLANA_AVAILABLE:
-            # SEMPRE tentar registro na devnet real primeiro
-            logger.info("Tentando registro REAL na devnet...")
+        if SOLANA_AVAILABLE and USE_REAL_TRANSACTIONS and WALLET_CONFIGURED:
+            # Tentar registro REAL na blockchain
+            logger.info(f"Tentando registro REAL na {ACTIVE_NETWORK}...")
+            return await _registry.register_real(certificado_hash, nome_participante, evento)
+        elif SOLANA_AVAILABLE:
+            # Simulação com bibliotecas Solana disponíveis
+            logger.info("Registro simulado (carteira não configurada ou transações reais desativadas)")
             return await _registry.register_simulated(certificado_hash, nome_participante, evento)
         else:
             # Fallback para simulação apenas se bibliotecas não estiverem disponíveis

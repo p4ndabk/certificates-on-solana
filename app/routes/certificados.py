@@ -48,9 +48,9 @@ async def registrar_certificado(request: CertificadoRequest):
         
         json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)        
         certificado_hash = gerar_hash_texto(json_canonico)
-        
+
         txid_solana = await registrar_hash_solana(certificado_hash, request.name, request.event)
-        
+
         return {
             "status": "sucesso",
             "certificado": {
@@ -86,55 +86,6 @@ async def registrar_certificado(request: CertificadoRequest):
             status_code=500,
             detail=f"Erro ao registrar certificado: {str(e)}"
         )
-
-
-@router.post("/validar-hash")
-async def validar_hash_certificado(request: CertificadoRequest):
-    """
-    Valida o hash de um certificado sem registrar na blockchain.
-    Útil para verificar se os dados geram o hash esperado.
-    
-    Args:
-        request (CertificadoRequest): Dados do certificado
-        
-    Returns:
-        dict: Hash gerado e JSON canonizado
-    """
-    
-    try:
-        current_time = datetime.now()
-        
-        certificate_data = {
-            "event": request.event,
-            "name": request.name,
-            "document": request.document,
-            "duration_hours": request.duration_hours,
-            "time": current_time.isoformat()
-        }
-        
-        json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
-        
-        certificado_hash = gerar_hash_texto(json_canonico)
-        
-        return {
-            "status": "validacao_sucesso",
-            "dados": certificate_data,
-            "duration_hours": request.duration_hours,
-            "json_canonico": certificate_data,
-            "json_canonico_string": json_canonico,
-            "hash_sha256": certificado_hash,
-            "instrucoes": {
-                "validacao_manual": f"printf '{json_canonico}' | shasum -a 256",
-                "validacao_python": f"import hashlib; hashlib.sha256('{json_canonico}'.encode()).hexdigest()"
-            }
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erro ao validar hash: {str(e)}"
-        )
-
 
 @router.get("/verificar/{txid}")
 async def verificar_certificado(txid: str):
