@@ -1,0 +1,7 @@
+# Arquivos de carteira - NUNCA commitar chaves privadas!
+*.json
+*.key
+*.pem
+
+# Backup da carteira
+*.backup

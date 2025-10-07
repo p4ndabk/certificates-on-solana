@@ -247,6 +247,81 @@ async def verificar_certificado(txid: str):
         )
 
 
+@router.get("/wallet-info")
+async def obter_informacoes_carteira():
+    """
+    Obtém informações sobre a carteira e saldo SOL.
+    
+    Returns:
+        dict: Informações da carteira e saldo
+    """
+    
+    try:
+        from ..services.blockchain import _registry
+        from ..wallet_config import USE_REAL_TRANSACTIONS, ACTIVE_NETWORK, WALLET_CONFIGURED, WALLET_PATH
+        
+        if not WALLET_CONFIGURED:
+            return {
+                "status": "carteira_nao_configurada",
+                "mensagem": "Você precisa configurar sua própria carteira",
+                "instrucoes": {
+                    "passo_1": "Crie sua carteira Solana usando: solana-keygen new",
+                    "passo_2": f"Salve o arquivo JSON em: {WALLET_PATH}",
+                    "passo_3": "Configure USE_REAL_TRANSACTIONS = True",
+                    "passo_4": "Transfira SOL para sua carteira se quiser usar mainnet",
+                    "alternativa": "Ou use o sistema em modo simulação (padrão atual)"
+                },
+                "configuracao_atual": {
+                    "carteira_configurada": False,
+                    "transacoes_reais": USE_REAL_TRANSACTIONS,
+                    "rede": ACTIVE_NETWORK,
+                    "modo": "simulacao_completa"
+                }
+            }
+        
+        if not _registry.keypair:
+            return {
+                "status": "erro",
+                "mensagem": "Carteira configurada mas não carregada corretamente"
+            }
+        
+        wallet_address = str(_registry.keypair.pubkey())
+        
+        # Verificar saldo se usando transações reais
+        if USE_REAL_TRANSACTIONS and _registry.client:
+            try:
+                balance_response = _registry.client.get_balance(_registry.keypair.pubkey())
+                balance_sol = balance_response.value / 1_000_000_000  # Converter de lamports para SOL
+            except Exception as e:
+                balance_sol = f"erro_ao_consultar: {str(e)}"
+        else:
+            balance_sol = "simulacao"
+        
+        return {
+            "status": "sucesso",
+            "carteira": {
+                "endereco": wallet_address,
+                "saldo_sol": balance_sol,
+                "rede": ACTIVE_NETWORK,
+                "transacoes_reais": USE_REAL_TRANSACTIONS,
+                "modo": "real" if USE_REAL_TRANSACTIONS else "simulacao"
+            },
+            "custos": {
+                "transacao_memo": "~0.000005 SOL",
+                "saldo_recomendado": "0.01 SOL"
+            },
+            "instrucoes": {
+                "obter_sol": f"Transfira SOL da Binance para: {wallet_address}" if USE_REAL_TRANSACTIONS else "Configure sua carteira primeiro"
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao obter informações da carteira: {str(e)}"
+        )
+
+
 @router.get("/info-rede")
 async def obter_informacoes_rede():
     """

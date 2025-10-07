@@ -6,8 +6,11 @@ import asyncio
 import secrets
 import time
 import json
+import os
 from typing import Optional
+from pathlib import Path
 from ..config import SOLANA_DEVNET_URL
+from ..wallet_config import USE_REAL_TRANSACTIONS, WALLET_PATH, RPC_URL, ACTIVE_NETWORK, WALLET_CONFIGURED, REQUIRE_MANUAL_SETUP
 
 # Importações condicionais para Solana
 try:
@@ -32,18 +35,44 @@ class SolanaCertificateRegistry:
     MEMO_PROGRAM_ID = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
     
     def __init__(self):
-        # Usando testnet - melhor opção para demonstração
-        self.network = "testnet"
-        self.rpc_url = "https://api.testnet.solana.com"
+        # Configuração dinâmica baseada no modo
+        self.network = ACTIVE_NETWORK
+        self.rpc_url = RPC_URL
+        self.use_real_transactions = USE_REAL_TRANSACTIONS
         
-        if SOLANA_AVAILABLE:
-            self.client = Client(self.rpc_url)
-            # Gerar keypair temporária para demonstração
-            # Em produção, carregaria de um arquivo seguro
-            self.keypair = Keypair()
-        else:
+        if REQUIRE_MANUAL_SETUP and not WALLET_CONFIGURED:
+            print("⚠️  CARTEIRA NÃO CONFIGURADA")
+            print("   O usuário deve configurar sua própria carteira")
+            print("   Execute modo simulação até configurar")
             self.client = None
             self.keypair = None
+        elif SOLANA_AVAILABLE and self.use_real_transactions and WALLET_CONFIGURED:
+            print(f"🔗 Conectando à Solana {self.network.upper()}")
+            self.client = Client(self.rpc_url)
+            self.keypair = self._load_wallet()
+        elif SOLANA_AVAILABLE:
+            print(f"🔄 Modo simulação com bibliotecas Solana ({self.network})")
+            self.client = Client(self.rpc_url) if not REQUIRE_MANUAL_SETUP else None
+            self.keypair = Keypair() if not REQUIRE_MANUAL_SETUP else None
+        else:
+            print(f"⚠️  Modo simulação completa ({self.network})")
+            self.client = None
+            self.keypair = None
+    
+    def _load_wallet(self):
+        """Carrega uma carteira existente (NÃO cria nova)"""
+        if not SOLANA_AVAILABLE or not WALLET_PATH.exists():
+            return None
+            
+        try:
+            print(f"📁 Carregando carteira de {WALLET_PATH}")
+            with open(WALLET_PATH, 'r') as f:
+                keypair_data = json.load(f)
+                return Keypair.from_bytes(bytes(keypair_data))
+                
+        except Exception as e:
+            print(f"❌ Erro ao carregar carteira: {e}")
+            return None
     
     def create_certificate_metadata(self, certificado_hash: str, nome_participante: str, evento: str = "Evento Geral") -> dict:
         """Cria metadados do certificado"""

@@ -3,8 +3,14 @@ Configurações globais da aplicação de certificados na Solana
 """
 
 # Configurações da Solana
-SOLANA_DEVNET_URL = "https://api.testnet.solana.com"
-SOLANA_NETWORK = "testnet"
+# TESTNET (gratuito - para desenvolvimento)
+SOLANA_TESTNET_URL = "https://api.testnet.solana.com"
+# MAINNET (real - requer SOL)
+SOLANA_MAINNET_URL = "https://api.mainnet-beta.solana.com"
+
+# Escolher rede (mude para 'mainnet' para transações reais)
+SOLANA_NETWORK = "testnet"  # Mude para "mainnet" quando quiser usar SOL real
+SOLANA_DEVNET_URL = SOLANA_TESTNET_URL if SOLANA_NETWORK == "testnet" else SOLANA_MAINNET_URL
 
 # Configurações do certificado
 CERTIFICATE_TITLE = "Certificado de Participação"
