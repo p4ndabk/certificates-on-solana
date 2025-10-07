@@ -7,7 +7,7 @@ from fpdf import FPDF
 from ..config import CERTIFICATE_TITLE, CERTIFICATE_ISSUER
 
 
-def gerar_certificado_pdf(hash_certificado: str, txid_solana: str, nome_participante: str = "Participante") -> bytes:
+def gerar_certificado_pdf(hash_certificado: str, txid_solana: str, nome_participante: str = "Participante", evento: str = "Evento Geral") -> bytes:
     """
     Gera um certificado em PDF com as informações do hash e TXID da Solana.
     
@@ -24,98 +24,132 @@ def gerar_certificado_pdf(hash_certificado: str, txid_solana: str, nome_particip
     pdf = FPDF()
     pdf.add_page()
     
-    # Configurar fonte principal
-    pdf.set_font("Helvetica", "B", 24)
+    # Margens personalizadas para melhor uso do espaço
+    pdf.set_margins(20, 20, 20)
     
-    # Título do certificado
-    pdf.cell(0, 20, CERTIFICATE_TITLE, ln=True, align='C')
-    pdf.ln(10)
+    # Header decorativo
+    pdf.set_font("Helvetica", "B", 28)
+    pdf.cell(0, 15, CERTIFICATE_TITLE, ln=True, align='C')
+    pdf.ln(5)
+    
+    # Linha decorativa
+    pdf.set_draw_color(50, 50, 50)
+    pdf.line(30, pdf.get_y(), 180, pdf.get_y())
+    pdf.ln(8)
     
     # Subtítulo
-    pdf.set_font("Helvetica", "I", 16)
-    pdf.cell(0, 15, "Autenticado na Blockchain Solana", ln=True, align='C')
-    pdf.ln(15)
+    pdf.set_font("Helvetica", "I", 14)
+    pdf.cell(0, 10, "Autenticado na Blockchain Solana", ln=True, align='C')
+    pdf.ln(8)
     
-    # Nome do participante
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 15, f"Certificamos que", ln=True, align='C')
-    pdf.ln(5)
+    # Nome do participante - seção principal
+    pdf.set_font("Helvetica", "", 16)
+    pdf.cell(0, 10, "Certificamos que", ln=True, align='C')
+    pdf.ln(3)
     
-    pdf.set_font("Helvetica", "B", 20)
-    pdf.cell(0, 15, nome_participante, ln=True, align='C')
-    pdf.ln(5)
+    pdf.set_font("Helvetica", "B", 22)
+    pdf.cell(0, 12, nome_participante, ln=True, align='C')
+    pdf.ln(3)
     
     pdf.set_font("Helvetica", "", 14)
-    pdf.cell(0, 15, "participou com sucesso do evento/curso.", ln=True, align='C')
-    pdf.ln(20)
+    pdf.cell(0, 10, f"participou com sucesso do evento: {evento}", ln=True, align='C')
+    pdf.ln(12)
     
-    # Informações de autenticação na blockchain
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, "INFORMAÇÕES DE AUTENTICAÇÃO BLOCKCHAIN", ln=True, align='C')
+    # Informações de autenticação blockchain - layout compacto
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(0, 8, "AUTENTICAÇÃO BLOCKCHAIN", ln=True, align='C')
+    pdf.ln(5)
+    
+    # Box para informações técnicas
+    y_start = pdf.get_y()
+    pdf.set_draw_color(200, 200, 200)
+    pdf.rect(25, y_start, 160, 35)
+    
+    # Hash SHA-256 - compacto
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(35, 6, "Hash SHA-256:", ln=False)
+    pdf.set_font("Helvetica", "", 8)
+    
+    # Dividir hash em duas linhas para melhor legibilidade
+    hash_line1 = hash_certificado[:32]
+    hash_line2 = hash_certificado[32:]
+    
+    pdf.cell(0, 6, hash_line1, ln=True)
+    pdf.cell(35, 6, "", ln=False)  # Espaço para alinhamento
+    pdf.cell(0, 6, hash_line2, ln=True)
+    
+    # TXID - compacto
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(35, 6, "Solana TXID:", ln=False)
+    pdf.set_font("Helvetica", "", 8)
+    
+    # Dividir TXID em duas linhas se muito longo
+    if len(txid_solana) > 32:
+        txid_line1 = txid_solana[:32]
+        txid_line2 = txid_solana[32:]
+        pdf.cell(0, 6, txid_line1, ln=True)
+        pdf.cell(35, 6, "", ln=False)
+        pdf.cell(0, 6, txid_line2, ln=True)
+    else:
+        pdf.cell(0, 6, txid_solana, ln=True)
+    
+    # Rede
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(35, 6, "Rede:", ln=False)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 6, "Solana Devnet", ln=True)
+    
+    pdf.ln(8)
+    
+    # Link do explorador - formatação melhorada
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "VERIFICAÇÃO NA BLOCKCHAIN:", ln=True, align='C')
+    pdf.ln(5)
+    
+    # URL do explorer em partes menores
+    pdf.set_font("Helvetica", "", 9)
+    explorer_base = "https://explorer.solana.com/tx/"
+    
+    # Primeira linha: Label e início da URL
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(30, 6, "Explorer:", ln=False)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 6, explorer_base, ln=True)
+    
+    # Segunda linha: TXID
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(30, 6, "TX ID:", ln=False)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 6, txid_solana, ln=True)
+    
+    # Terceira linha: Cluster
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(30, 6, "Cluster:", ln=False)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 6, "devnet", ln=True)
+    
     pdf.ln(10)
     
-    # Hash do certificado
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(40, 8, "Hash SHA-256:", ln=False)
-    pdf.set_font("Helvetica", "", 10)
-    
-    # Quebrar hash em linhas para melhor visualização
-    hash_lines = [hash_certificado[i:i+32] for i in range(0, len(hash_certificado), 32)]
-    for i, line in enumerate(hash_lines):
-        if i == 0:
-            pdf.cell(0, 8, line, ln=True)
-        else:
-            pdf.cell(40, 8, "", ln=False)  # Espaço para alinhamento
-            pdf.cell(0, 8, line, ln=True)
-    
-    pdf.ln(5)
-    
-    # TXID da Solana
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(40, 8, "Solana TXID:", ln=False)
-    pdf.set_font("Helvetica", "", 10)
-    
-    # Quebrar TXID em linhas se necessário
-    txid_lines = [txid_solana[i:i+32] for i in range(0, len(txid_solana), 32)]
-    for i, line in enumerate(txid_lines):
-        if i == 0:
-            pdf.cell(0, 8, line, ln=True)
-        else:
-            pdf.cell(40, 8, "", ln=False)  # Espaço para alinhamento
-            pdf.cell(0, 8, line, ln=True)
-    
-    pdf.ln(5)
-    
-    # Rede Solana
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(40, 8, "Rede:", ln=False)
-    pdf.set_font("Helvetica", "", 12)
-    pdf.cell(0, 8, "Solana Devnet", ln=True)
-    pdf.ln(5)
-    
-    # Link do explorador
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(40, 8, "Verificar em:", ln=False)
-    pdf.set_font("Helvetica", "", 10)
-    explorer_url = f"https://explorer.solana.com/tx/{txid_solana}?cluster=devnet"
-    pdf.cell(0, 8, explorer_url, ln=True)
-    pdf.ln(15)
-    
-    # Data de emissão
+    # Data de emissão e informações finais
     data_emissao = datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
-    pdf.set_font("Helvetica", "", 12)
-    pdf.cell(0, 8, f"Emitido em: {data_emissao}", ln=True, align='C')
-    pdf.ln(10)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 6, f"Emitido em: {data_emissao}", ln=True, align='C')
+    pdf.ln(5)
     
     # Emissor
     pdf.set_font("Helvetica", "I", 10)
-    pdf.cell(0, 8, f"Emitido por: {CERTIFICATE_ISSUER}", ln=True, align='C')
-    pdf.ln(5)
+    pdf.cell(0, 6, f"Emitido por: {CERTIFICATE_ISSUER}", ln=True, align='C')
+    pdf.ln(8)
     
-    # Nota sobre verificação
+    # Instruções de verificação - mais compactas
     pdf.set_font("Helvetica", "", 8)
-    pdf.cell(0, 5, "Este certificado pode ser verificado na blockchain Solana usando o TXID acima.", ln=True, align='C')
-    pdf.cell(0, 5, "A autenticidade é garantida pela imutabilidade da blockchain.", ln=True, align='C')
+    pdf.cell(0, 4, "Para verificar este certificado, acesse o Solana Explorer com o TXID acima.", ln=True, align='C')
+    pdf.cell(0, 4, "A autenticidade é garantida pela imutabilidade da blockchain Solana.", ln=True, align='C')
+    
+    # Linha decorativa final
+    pdf.ln(5)
+    pdf.set_draw_color(50, 50, 50)
+    pdf.line(30, pdf.get_y(), 180, pdf.get_y())
     
     # Retornar o PDF como bytes
     pdf_output = pdf.output()

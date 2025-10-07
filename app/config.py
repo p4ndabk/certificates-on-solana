@@ -3,8 +3,8 @@ Configurações globais da aplicação de certificados na Solana
 """
 
 # Configurações da Solana
-SOLANA_DEVNET_URL = "https://api.devnet.solana.com"
-SOLANA_NETWORK = "devnet"
+SOLANA_DEVNET_URL = "https://api.testnet.solana.com"
+SOLANA_NETWORK = "testnet"
 
 # Configurações do certificado
 CERTIFICATE_TITLE = "Certificado de Participação"

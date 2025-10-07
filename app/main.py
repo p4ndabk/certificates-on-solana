@@ -73,9 +73,21 @@ async def home():
                 <h2>🚀 Endpoints Disponíveis</h2>
                 
                 <div class="endpoint">
+                    <span class="method">POST</span> <strong>/certificados/registrar</strong>
+                    <p>Registra um certificado na blockchain e retorna dados JSON</p>
+                    <p><em>Parâmetros:</em> nome_participante, evento (JSON)</p>
+                </div>
+                
+                <div class="endpoint">
                     <span class="method">POST</span> <strong>/certificados/emitir</strong>
-                    <p>Emite um certificado autenticado na blockchain Solana</p>
+                    <p>Emite um certificado autenticado na blockchain Solana (PDF)</p>
                     <p><em>Parâmetros:</em> nome_participante (form), evento (form, opcional)</p>
+                </div>
+                
+                <div class="endpoint">
+                    <span class="method">POST</span> <strong>/certificados/emitir-json</strong>
+                    <p>Emite um certificado autenticado na blockchain Solana (PDF via JSON)</p>
+                    <p><em>Parâmetros:</em> nome_participante, evento (JSON)</p>
                 </div>
                 
                 <div class="endpoint">
@@ -100,12 +112,24 @@ async def home():
                 <h2>📖 Documentação</h2>
                 <p><a href="/docs" target="_blank">Swagger UI (Interactive API docs)</a></p>
                 <p><a href="/redoc" target="_blank">ReDoc (Alternative API docs)</a></p>
+            <div class="section">
+                <h2>🧪 Teste Rápido</h2>
+                <p><strong>1. Registrar certificado (apenas dados JSON):</strong></p>
+                <pre>curl -X POST "http://localhost:8000/certificados/registrar" \\
+     -H "Content-Type: application/json" \\
+     -d '{"nome_participante":"João Silva","evento":"Workshop Blockchain"}'</pre>
+                
+                <p><strong>2. Emitir certificado (PDF):</strong></p>
+                <pre>curl -X POST "http://localhost:8000/certificados/emitir-json" \\
+     -H "Content-Type: application/json" \\
+     -d '{"nome_participante":"João Silva","evento":"Workshop Blockchain"}' \\
+     --output certificado.pdf</pre>
             </div>
             
             <div class="section">
                 <h2>🔗 Blockchain</h2>
-                <p><strong>Rede:</strong> Solana Devnet</p>
-                <p><strong>Explorer:</strong> <a href="https://explorer.solana.com/?cluster=devnet" target="_blank">Solana Explorer (Devnet)</a></p>
+                <p><strong>Rede:</strong> Solana Testnet</p>
+                <p><strong>Explorer:</strong> <a href="https://explorer.solana.com/?cluster=testnet" target="_blank">Solana Explorer (Testnet)</a></p>
             </div>
             
             <div class="section">
@@ -173,13 +197,14 @@ async def emitir_certificado_mvp(
         certificado_hash = gerar_hash_sha256(conteudo_bytes)
         
         # 2. Função de Registro na Solana - registrar_hash_solana
-        txid_solana = await registrar_hash_solana(certificado_hash)
+        txid_solana = await registrar_hash_solana(certificado_hash, nome_participante, evento)
         
         # 3. Função de Geração de PDF - gerar_certificado_pdf
         pdf_bytes = gerar_certificado_pdf(
             hash_certificado=certificado_hash,
             txid_solana=txid_solana,
-            nome_participante=nome_participante
+            nome_participante=nome_participante,
+            evento=evento
         )
         
         # 4. Endpoint FastAPI - Retorna Response com PDF
@@ -206,6 +231,59 @@ class CertificadoRequest(BaseModel):
     nome_participante: str
     evento: str = "Evento Geral"
 
+@app.post("/certificados/registrar")
+async def registrar_certificado_json(request: CertificadoRequest):
+    """
+    Registra um certificado na blockchain e retorna apenas os dados JSON.
+    
+    Args:
+        request (CertificadoRequest): Dados do certificado em JSON
+        
+    Returns:
+        dict: Dados do registro incluindo hash e TXID
+    """
+    
+    try:
+        # 1. Função de Hashing - gerar_hash_sha256
+        conteudo_certificado = f"Certificado para {request.nome_participante} - {request.evento}"
+        conteudo_bytes = conteudo_certificado.encode('utf-8')
+        certificado_hash = gerar_hash_sha256(conteudo_bytes)
+        
+        # 2. Função de Registro na Solana - registrar_hash_solana
+        txid_solana = await registrar_hash_solana(certificado_hash, request.nome_participante, request.evento)
+        
+        # 3. Retornar dados JSON do registro
+        from datetime import datetime
+        
+        return {
+            "status": "sucesso",
+            "certificado": {
+                "nome_participante": request.nome_participante,
+                "evento": request.evento,
+                "hash_sha256": certificado_hash,
+                "txid_solana": txid_solana,
+                "network": "testnet",
+                "timestamp": datetime.now().isoformat(),
+                "timestamp_unix": int(datetime.now().timestamp())
+            },
+            "blockchain": {
+                "rede": "Solana Testnet",
+                "explorer_url": f"https://explorer.solana.com/tx/{txid_solana}?cluster=testnet",
+                "verificacao_url": f"http://localhost:8000/certificados/verificar",
+                "memo_program": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
+            },
+            "instrucoes": {
+                "como_verificar": "Use o TXID no Solana Explorer ou no endpoint /certificados/verificar",
+                "como_gerar_pdf": "Use o endpoint /certificados/emitir-json com os mesmos dados"
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao registrar certificado: {str(e)}"
+        )
+
 @app.post("/certificados/emitir-json")
 async def emitir_certificado_json(request: CertificadoRequest):
     """
@@ -225,13 +303,14 @@ async def emitir_certificado_json(request: CertificadoRequest):
         certificado_hash = gerar_hash_sha256(conteudo_bytes)
         
         # 2. Função de Registro na Solana - registrar_hash_solana
-        txid_solana = await registrar_hash_solana(certificado_hash)
+        txid_solana = await registrar_hash_solana(certificado_hash, request.nome_participante, request.evento)
         
         # 3. Função de Geração de PDF - gerar_certificado_pdf
         pdf_bytes = gerar_certificado_pdf(
             hash_certificado=certificado_hash,
             txid_solana=txid_solana,
-            nome_participante=request.nome_participante
+            nome_participante=request.nome_participante,
+            evento=request.evento
         )
         
         # 4. Endpoint FastAPI - Retorna Response com PDF
@@ -258,7 +337,7 @@ if __name__ == "__main__":
     print(f"Iniciando {APP_NAME} v{APP_VERSION}")
     print("Documentação disponível em: http://localhost:8000/docs")
     print("Página inicial: http://localhost:8000")
-    print("Solana Devnet Explorer: https://explorer.solana.com/?cluster=devnet")
+    print("Solana Testnet Explorer: https://explorer.solana.com/?cluster=testnet")
     
     uvicorn.run(
         "app.main:app",
