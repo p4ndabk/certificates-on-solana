@@ -50,7 +50,7 @@ async def registrar_certificado(request: CertificadoRequest):
         certificado_hash = gerar_hash_texto(json_canonico)
 
         txid_solana = await registrar_hash_solana(certificado_hash, request.name, request.event)
-
+        print(f"Certificado hash: {certificado_hash}")
         return {
             "status": "sucesso",
             "certificado": {

@@ -133,7 +133,7 @@ curl -X POST "http://localhost:8000/certificados/registrar" \
      -d '{
        "name": "David Richard",
        "event": "PythonFloripa",
-       "document": "08625455956", 
+       "document": "08625455153", 
        "duration_hours": 5
      }'
 ```
@@ -149,7 +149,7 @@ O sistema usa JSON canonizado para garantir hashes consistentes:
 
 ### Exemplo de JSON Canonizado:
 ```json
-{"document":"08625455956","duration_hours":5,"event":"PythonFloripa","name":"David Richard","time":"2025-10-07T15:30:45.123456","uuid":"550e8400-e29b-41d4-a716-446655440000"}
+{"document":"08625455153","duration_hours":5,"event":"PythonFloripa","name":"David Richard","time":"2025-10-07T15:30:45.123456","uuid":"550e8400-e29b-41d4-a716-446655440000"}
 ```
 
 ## Configuração de Carteira
@@ -236,7 +236,7 @@ solana: https://explorer.solana.com/tx/4BCKEC12t748Laf27aVQzKFL5JsqikuvQQsXmWn3w
     "certificado": {
         "event": "PlythonFloripa",
         "name": "David Richard",
-        "document": "08625455956",
+        "document": "08625455153",
         "uuid": "4f126041-9c58-4e26-b641-4cb9dada81f1",
         "time": "2025-10-07T15:08:04.641753",
         "duration_hours": 5,
@@ -244,7 +244,7 @@ solana: https://explorer.solana.com/tx/4BCKEC12t748Laf27aVQzKFL5JsqikuvQQsXmWn3w
             "event": "PlythonFloripa",
             "uuid": "4f126041-9c58-4e26-b641-4cb9dada81f1",
             "name": "David Richard",
-            "document": "08625455956",
+            "document": "08625455153",
             "duration_hours": 5,
             "time": "2025-10-07T15:08:04.641753"
         },

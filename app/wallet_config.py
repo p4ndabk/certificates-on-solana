@@ -6,7 +6,7 @@ PROJECT_ROOT = Path(__file__).parent.parent  # Vai para a raiz do projeto
 WALLET_PATH = PROJECT_ROOT / "wallet" / "certificates-wallet.json"
 
 # Configurações de segurança
-USE_REAL_TRANSACTIONS = False  # Usuário deve ativar manualmente
+USE_REAL_TRANSACTIONS = True  # Usuário deve ativar manualmente
 MINIMUM_SOL_BALANCE = 0.01     # Saldo mínimo em SOL para operar
 
 # URLs de rede
@@ -17,7 +17,7 @@ NETWORKS = {
 }
 
 # Configuração ativa
-ACTIVE_NETWORK = "testnet"  # Usuário pode mudar para "mainnet"
+ACTIVE_NETWORK = "devnet"  # Usuário pode mudar para "mainnet"
 RPC_URL = NETWORKS[ACTIVE_NETWORK]
 
 # Custos aproximados (em SOL)
