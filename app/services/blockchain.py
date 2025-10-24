@@ -113,25 +113,37 @@ class SolanaCertificateRegistry:
         recent_blockhash_response = self.client.get_latest_blockhash()
         recent_blockhash = recent_blockhash_response.value.blockhash
         
-        # Tenta método moderno primeiro
+        # Usa método que funcionava antes do refactor
         try:
+            from solders.message import MessageV0
+            from solders.transaction import VersionedTransaction
+            
             message = MessageV0.try_compile(
                 payer=self.keypair.pubkey(),
                 instructions=[instruction],
                 address_lookup_table_accounts=[],
                 recent_blockhash=recent_blockhash
             )
-            return Transaction([self.keypair], message, recent_blockhash)
-        except Exception:
+            
+            return VersionedTransaction(message, [self.keypair])
+            
+        except Exception as e:
+            logger.warning(f"Método moderno falhou: {e}, tentando legado...")
             # Fallback para método legado
-            from solana.transaction import Transaction as SolanaTransaction
-            transaction = SolanaTransaction(
-                fee_payer=self.keypair.pubkey(),
-                instructions=[instruction],
-                recent_blockhash=recent_blockhash
-            )
-            transaction.sign(self.keypair)
-            return transaction
+            try:
+                from solana.transaction import Transaction as SolanaTransaction
+                
+                transaction = SolanaTransaction(
+                    fee_payer=self.keypair.pubkey(),
+                    instructions=[instruction],
+                    recent_blockhash=recent_blockhash
+                )
+                transaction.sign(self.keypair)
+                return transaction
+            except Exception as e2:
+                logger.error(f"Ambos métodos falharam: {e2}")
+                raise Exception(f"Erro na criação da transação: {str(e)} | Fallback: {str(e2)}")
+
     
     async def _ensure_balance_for_devnet(self):
         """Garante saldo na devnet via airdrop se necessário"""

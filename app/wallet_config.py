@@ -6,7 +6,7 @@ PROJECT_ROOT = Path(__file__).parent.parent  # Vai para a raiz do projeto
 WALLET_PATH = PROJECT_ROOT / "wallet" / "certificates-wallet.json"
 
 # Configurações de segurança
-USE_REAL_TRANSACTIONS = True  # Usuário deve ativar manualmente
+USE_REAL_TRANSACTIONS = False  # Mudado para False para usar devnet primeiro
 MINIMUM_SOL_BALANCE = 0.01     # Saldo mínimo em SOL para operar
 
 # URLs de rede
