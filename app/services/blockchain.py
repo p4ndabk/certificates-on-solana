@@ -21,7 +21,6 @@ try:
     from solders.instruction import Instruction
     from solders.transaction import Transaction
     from solders.message import MessageV0
-    from solders.hash import Hash
     SOLANA_AVAILABLE = True
 except ImportError:
     SOLANA_AVAILABLE = False
@@ -37,262 +36,179 @@ class SolanaCertificateRegistry:
         self.network = ACTIVE_NETWORK
         self.rpc_url = RPC_URL
         self.use_real_transactions = USE_REAL_TRANSACTIONS
+        self.client = None
+        self.keypair = None
         
+        self._initialize_client()
+    
+    def _initialize_client(self):
+        """Inicializa cliente e carteira conforme configuração"""
         if REQUIRE_MANUAL_SETUP and not WALLET_CONFIGURED:
             logger.warning("Carteira não configurada - usuário deve configurar manualmente")
-            self.client = None
-            self.keypair = None
-        elif SOLANA_AVAILABLE and self.use_real_transactions and WALLET_CONFIGURED:
-            logger.info(f"Conectando à Solana {self.network.upper()}")
-            self.client = Client(self.rpc_url)
-            self.keypair = self._load_wallet()
-        elif SOLANA_AVAILABLE:
-            logger.info(f"Modo simulação com bibliotecas Solana ({self.network})")
-            self.client = Client(self.rpc_url) if not REQUIRE_MANUAL_SETUP else None
-            self.keypair = Keypair() if not REQUIRE_MANUAL_SETUP else None
-        else:
+            return
+            
+        if not SOLANA_AVAILABLE:
             logger.info(f"Modo simulação completa ({self.network})")
-            self.client = None
-            self.keypair = None
+            return
+            
+        logger.info(f"Conectando à Solana {self.network.upper()}")
+        self.client = Client(self.rpc_url)
+        
+        if WALLET_CONFIGURED and WALLET_PATH.exists():
+            self.keypair = self._load_wallet()
+        else:
+            self.keypair = Keypair()
+            logger.info(f"Criando carteira temporária: {str(self.keypair.pubkey())}")
     
     def _load_wallet(self):
-        """Carrega uma carteira existente"""
-        if not SOLANA_AVAILABLE or not WALLET_PATH.exists():
-            return None
-            
+        """Carrega carteira existente do arquivo"""
         try:
             logger.info(f"Carregando carteira de {WALLET_PATH}")
             with open(WALLET_PATH, 'r') as f:
                 keypair_data = json.load(f)
                 return Keypair.from_bytes(bytes(keypair_data))
-                
         except Exception as e:
             logger.error(f"Erro ao carregar carteira: {e}")
             return None
     
-    def create_certificate_metadata(self, certificado_hash: str, nome_participante: str, evento: str = "Evento Geral") -> dict:
-        """Cria metadados do certificado"""
-        return {
+    def _create_metadata(self, certificado_hash: str, nome_participante: str, evento: str) -> str:
+        """Cria e otimiza metadados do certificado"""
+        metadata = {
             "version": "1.0",
             "tipo": "certificado_participacao",
             "participante": nome_participante,
             "evento": evento,
             "timestamp": int(time.time()),
-            "timestamp_iso": time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
             "doc_hash": certificado_hash,
             "network": self.network,
             "emissor": "Sistema de Certificados Blockchain"
         }
+        
+        memo_data = json.dumps(metadata, ensure_ascii=False, separators=(',', ':'))
+        
+        # Otimiza se muito grande
+        if len(memo_data.encode('utf-8')) > 1232:
+            compact_metadata = {
+                "tipo": "cert",
+                "participante": nome_participante[:50],
+                "evento": evento[:30],
+                "hash": certificado_hash,
+                "timestamp": int(time.time())
+            }
+            memo_data = json.dumps(compact_metadata, separators=(',', ':'))
+        
+        return memo_data
     
-    async def register_real(self, certificado_hash: str, nome_participante: str, evento: str = "Evento Geral") -> str:
-        """Registra o certificado na blockchain Solana real"""
-        if not SOLANA_AVAILABLE:
-            raise Exception("Bibliotecas Solana não disponíveis")
-                
+    def _create_transaction(self, memo_data: str):
+        """Cria transação Solana com os metadados"""
+        memo_bytes = memo_data.encode('utf-8')
+        memo_pubkey = Pubkey.from_string(self.MEMO_PROGRAM_ID)
+        
+        instruction = Instruction(
+            program_id=memo_pubkey,
+            accounts=[],
+            data=memo_bytes
+        )
+        
+        recent_blockhash_response = self.client.get_latest_blockhash()
+        recent_blockhash = recent_blockhash_response.value.blockhash
+        
+        # Tenta método moderno primeiro
         try:
-            metadata = self.create_certificate_metadata(certificado_hash, nome_participante, evento)
-            memo_data = json.dumps(metadata, ensure_ascii=False, separators=(',', ':'))
-            
-            if len(memo_data.encode('utf-8')) > 1232:
-                compact_metadata = {
-                    "tipo": "cert",
-                    "participante": nome_participante[:50],
-                    "evento": evento[:30],
-                    "hash": certificado_hash,
-                    "timestamp": int(time.time())
-                }
-                memo_data = json.dumps(compact_metadata, separators=(',', ':'))
-            
-            logger.debug(f"Tamanho do memo: {len(memo_data.encode('utf-8'))} bytes")
-            
-            memo_bytes = memo_data.encode('utf-8')
-            memo_pubkey = Pubkey.from_string(self.MEMO_PROGRAM_ID)
-            
-            instruction = Instruction(
-                program_id=memo_pubkey,
-                accounts=[],
-                data=memo_bytes
-            )
-            
-            try:
-                from solana.transaction import Transaction as SolanaTransaction
-                
-                recent_blockhash_response = self.client.get_latest_blockhash()
-                recent_blockhash = recent_blockhash_response.value.blockhash
-                
-                transaction = SolanaTransaction(
-                    fee_payer=self.keypair.pubkey(),
-                    instructions=[instruction],
-                    recent_blockhash=recent_blockhash
-                )
-                
-                transaction.sign(self.keypair)
-                response = self.client.send_transaction(transaction)
-                tx_signature = str(response.value)
-                
-                return tx_signature
-                
-            except Exception as e:
-                logger.error(f"Erro na transação real: {e}")
-                try:
-                    recent_blockhash_response = self.client.get_latest_blockhash()
-                    recent_blockhash = recent_blockhash_response.value.blockhash
-                    
-                    from solders.transaction import VersionedTransaction
-                    from solders.message import MessageV0
-                    
-                    message = MessageV0.try_compile(
-                        payer=self.keypair.pubkey(),
-                        instructions=[instruction],
-                        address_lookup_table_accounts=[],
-                        recent_blockhash=recent_blockhash
-                    )
-                    
-                    transaction = VersionedTransaction(message, [self.keypair])
-                    response = self.client.send_transaction(transaction)
-                    tx_signature = str(response.value)
-                    
-                    logger.info(f"Transação enviada (solders) - TXID: {tx_signature}")
-                    return tx_signature
-                    
-                except Exception as e2:
-                    logger.error(f"Ambos métodos falharam: {e2}")
-                    raise Exception(f"Falha na transação: {str(e)} | Fallback: {str(e2)}")
-                
-        except Exception as e:
-            logger.error(f"Erro no registro: {e}")
-            raise Exception(f"Falha ao registrar na Solana: {str(e)}")
-    
-    async def register_simulated(self, certificado_hash: str, nome_participante: str, evento: str = "Evento Geral") -> str:
-        """Registra o certificado na blockchain Solana devnet"""
-        logger.info("Registrando certificado na Solana devnet")
-        
-        metadata = self.create_certificate_metadata(certificado_hash, nome_participante, evento)
-        
-        if not SOLANA_AVAILABLE:
-            logger.warning("Bibliotecas Solana não disponíveis - usando simulação")
-            await asyncio.sleep(0.5)
-            timestamp = str(int(time.time()))
-            hash_prefix = certificado_hash[:8]
-            simulated_tx = f"{hash_prefix}{secrets.token_hex(24)}{timestamp[-4:]}"
-            logger.info(f"Certificado registrado (simulado) - TXID: {simulated_tx}")
-            return simulated_tx
-        
-        try:
-            if not self.client:
-                self.client = Client("https://api.devnet.solana.com")
-                logger.info("Conectando à Solana devnet")
-            
-            if not self.keypair:
-                self.keypair = Keypair()
-                logger.info(f"Criando carteira temporária: {str(self.keypair.pubkey())}")
-                
-                try:
-                    airdrop_response = self.client.request_airdrop(self.keypair.pubkey(), 1_000_000_000)
-                    await asyncio.sleep(5)
-                    
-                    balance_response = self.client.get_balance(self.keypair.pubkey())
-                    balance_sol = balance_response.value / 1_000_000_000
-                    
-                    if balance_sol == 0:
-                        logger.warning("Airdrop ainda processando, continuando mesmo assim...")
-                    
-                except Exception as e:
-                    logger.warning(f"Erro no airdrop: {e} - Tentando transação mesmo assim...")
-            
-            memo_data = json.dumps(metadata, ensure_ascii=False, separators=(',', ':'))
-            
-            if len(memo_data.encode('utf-8')) > 1232:
-                compact_metadata = {
-                    "tipo": "cert",
-                    "participante": nome_participante[:50],
-                    "evento": evento[:30],
-                    "hash": certificado_hash,
-                    "timestamp": int(time.time())
-                }
-                memo_data = json.dumps(compact_metadata, separators=(',', ':'))
-            
-            logger.debug(f"Tamanho do memo: {len(memo_data.encode('utf-8'))} bytes")
-            
-            memo_bytes = memo_data.encode('utf-8')
-            memo_pubkey = Pubkey.from_string(self.MEMO_PROGRAM_ID)
-            
-            instruction = Instruction(
-                program_id=memo_pubkey,
-                accounts=[],
-                data=memo_bytes
-            )
-            
-            logger.info("Preparando transação para a devnet...")
-            recent_blockhash_response = self.client.get_latest_blockhash()
-            recent_blockhash = recent_blockhash_response.value.blockhash
-            
-            from solders.message import MessageV0
-            from solders.transaction import Transaction
-            
             message = MessageV0.try_compile(
                 payer=self.keypair.pubkey(),
                 instructions=[instruction],
                 address_lookup_table_accounts=[],
                 recent_blockhash=recent_blockhash
             )
+            return Transaction([self.keypair], message, recent_blockhash)
+        except Exception:
+            # Fallback para método legado
+            from solana.transaction import Transaction as SolanaTransaction
+            transaction = SolanaTransaction(
+                fee_payer=self.keypair.pubkey(),
+                instructions=[instruction],
+                recent_blockhash=recent_blockhash
+            )
+            transaction.sign(self.keypair)
+            return transaction
+    
+    async def _ensure_balance_for_devnet(self):
+        """Garante saldo na devnet via airdrop se necessário"""
+        if not self.keypair or self.network != "devnet":
+            return
             
-            transaction = Transaction([self.keypair], message, recent_blockhash)
+        try:
+            balance_response = self.client.get_balance(self.keypair.pubkey())
+            balance_sol = balance_response.value / 1_000_000_000
             
-            logger.info("Enviando transação para Solana devnet...")
+            if balance_sol < 0.001:  # Menos de 0.001 SOL
+                logger.info("Solicitando airdrop na devnet...")
+                airdrop_response = self.client.request_airdrop(self.keypair.pubkey(), 1_000_000_000)
+                await asyncio.sleep(3)
+        except Exception as e:
+            logger.warning(f"Erro no airdrop: {e}")
+    
+    def _generate_simulated_txid(self) -> str:
+        """Gera TXID simulado no formato Solana"""
+        base58_alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+        import random
+        return ''.join(random.choice(base58_alphabet) for _ in range(88))
+    
+    async def register_certificate(self, certificado_hash: str, nome_participante: str, evento: str = "Evento Geral") -> str:
+        """Registra certificado na blockchain com fallback automático"""
+        # Simulação total se Solana não disponível
+        if not SOLANA_AVAILABLE:
+            logger.warning("Bibliotecas Solana não disponíveis - usando simulação")
+            await asyncio.sleep(0.5)
+            return self._generate_simulated_txid()
+        
+        # Simulação se configuração incompleta
+        if not self.client or not self.keypair:
+            logger.info("Cliente/carteira não configurados - usando simulação")
+            await asyncio.sleep(0.5)
+            return self._generate_simulated_txid()
+        
+        try:
+            # Garante saldo na devnet
+            await self._ensure_balance_for_devnet()
+            
+            # Cria metadados e transação
+            memo_data = self._create_metadata(certificado_hash, nome_participante, evento)
+            logger.debug(f"Tamanho do memo: {len(memo_data.encode('utf-8'))} bytes")
+            
+            transaction = self._create_transaction(memo_data)
+            
+            # Envia transação
+            logger.info(f"Enviando transação para Solana {self.network}...")
             response = self.client.send_transaction(transaction)
             tx_signature = str(response.value)
             
+            logger.info(f"Certificado registrado - TXID: {tx_signature}")
             return tx_signature
             
         except Exception as e:
-            logger.error(f"Erro no registro na devnet: {e}")
+            logger.error(f"Erro no registro: {e}")
             logger.info("Usando fallback simulado...")
-            
             await asyncio.sleep(0.5)
-            
-            def generate_solana_txid():
-                """Gera um TXID no formato base58 válido da Solana"""
-                import random
-                
-                base58_alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-                txid_length = 88
-                return ''.join(random.choice(base58_alphabet) for _ in range(txid_length))
-            
-            valid_txid = generate_solana_txid()
-            logger.info(f"Certificado registrado (formato base58 Solana) - TXID: {valid_txid}")
-            return valid_txid
+            return self._generate_simulated_txid()
 
 
+# Instância global
 _registry = SolanaCertificateRegistry()
 
 
 async def registrar_hash_solana(certificado_hash: str, nome_participante: str = "Participante", evento: str = "Evento Geral") -> str:
     """Registra o hash do certificado na blockchain Solana"""
-    try:
-        if SOLANA_AVAILABLE and USE_REAL_TRANSACTIONS and WALLET_CONFIGURED:
-            logger.info(f"Tentando registro REAL na {ACTIVE_NETWORK}...")
-            return await _registry.register_real(certificado_hash, nome_participante, evento)
-        elif SOLANA_AVAILABLE:
-            logger.info("Registro simulado")
-            return await _registry.register_simulated(certificado_hash, nome_participante, evento)
-        else:
-            logger.warning("Bibliotecas Solana não disponíveis - usando simulação")
-            return await _registry.register_simulated(certificado_hash, nome_participante, evento)
-            
-    except Exception as e:
-        logger.warning(f"Erro no registro, usando fallback: {e}")
-        return await _registry.register_simulated(certificado_hash, nome_participante, evento)
+    return await _registry.register_certificate(certificado_hash, nome_participante, evento)
 
 
 async def verificar_transacao(txid: str) -> Optional[dict]:
     """Verifica se uma transação existe na blockchain Solana"""
     try:
-        await asyncio.sleep(0.3) 
+        await asyncio.sleep(0.3)
         
         if SOLANA_AVAILABLE and _registry.client:
-            logger.debug(f"Verificando TXID real na devnet: {txid}")
-            
             try:
                 response = _registry.client.get_transaction(txid)
                 if response.value:
@@ -302,22 +218,20 @@ async def verificar_transacao(txid: str) -> Optional[dict]:
                         "slot": response.value.slot,
                         "block_time": response.value.block_time,
                         "status": "confirmed",
-                        "network": "devnet",
-                        "explorer_url": f"https://explorer.solana.com/tx/{txid}?cluster=devnet",
-                        "timestamp": response.value.block_time if response.value.block_time else int(time.time()),
+                        "network": _registry.network,
+                        "explorer_url": f"https://explorer.solana.com/tx/{txid}?cluster={_registry.network}",
+                        "timestamp": response.value.block_time or int(time.time()),
                         "verificacao": "blockchain_real"
                     }
-                else:
-                    logger.warning(f"Transação não encontrada na blockchain: {txid}")
             except Exception as e:
                 logger.warning(f"Erro ao verificar na blockchain: {e}")
         
-        logger.debug(f"Verificação simulada para TXID: {txid}")
+        # Fallback simulado
         return {
             "txid": txid,
             "status": "confirmed",
-            "network": "devnet",
-            "explorer_url": f"https://explorer.solana.com/tx/{txid}?cluster=devnet",
+            "network": _registry.network,
+            "explorer_url": f"https://explorer.solana.com/tx/{txid}?cluster={_registry.network}",
             "timestamp": int(time.time()),
             "verificacao": "simulada" if not SOLANA_AVAILABLE else "conectado_mas_nao_encontrado"
         }
@@ -332,26 +246,27 @@ async def obter_info_rede() -> dict:
     try:
         await asyncio.sleep(0.2)
         
+        base_info = {
+            "network": _registry.network,
+            "version": "1.18.0",
+            "url": _registry.rpc_url,
+            "keypair_loaded": _registry.keypair is not None,
+            "explorer": f"https://explorer.solana.com/?cluster={_registry.network}"
+        }
+        
         if SOLANA_AVAILABLE:
             return {
-                "network": "devnet",
-                "version": "1.18.0",
-                "url": "https://api.devnet.solana.com",
+                **base_info,
                 "status": "connected",
                 "biblioteca_solana": "instalada",
-                "keypair_loaded": _registry.keypair is not None,
                 "modo": "blockchain_real_gratuita",
-                "airdrop_disponivel": True,
-                "explorer": "https://explorer.solana.com/?cluster=devnet"
+                "airdrop_disponivel": _registry.network == "devnet"
             }
         else:
             return {
-                "network": "devnet",
-                "version": "1.18.0",
-                "url": "https://api.devnet.solana.com",
+                **base_info,
                 "status": "simulado",
                 "biblioteca_solana": "nao_instalada",
-                "keypair_loaded": False,
                 "modo": "simulacao",
                 "instrucoes": "Execute 'pip install solana solders' para registro real GRATUITO na devnet"
             }
@@ -364,4 +279,5 @@ async def obter_info_rede() -> dict:
         }
 
 
+# Compatibilidade com código existente
 BlockchainService = SolanaCertificateRegistry
