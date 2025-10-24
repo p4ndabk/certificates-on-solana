@@ -125,17 +125,14 @@ async def verificar_certificado(txid: str, certificado_data: CertificadoVerifica
             ]
         }
 
-        # Convert payload to JSON and encode
         json_data = json.dumps(payload).encode('utf-8')
 
-        # Create request
         req = urllib.request.Request(
             RPC_URL,
             data=json_data,
             headers={'Content-Type': 'application/json'}
         )
 
-        # Make request
         with urllib.request.urlopen(req) as response:
             data = json.loads(response.read().decode('utf-8'))
 
@@ -171,7 +168,6 @@ async def verificar_certificado(txid: str, certificado_data: CertificadoVerifica
             json_canonico = json.dumps(certificate_dict, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
             generated_hash = gerar_hash_texto(json_canonico)
 
-            # Compare hashes
             hash_valido = blockchain_doc_hash == generated_hash
 
             return {
@@ -244,23 +240,67 @@ async def obter_informacoes_carteira():
 
         wallet_address = str(_registry.keypair.pubkey())
 
-        if USE_REAL_TRANSACTIONS and _registry.client:
-            try:
-                balance_response = _registry.client.get_balance(_registry.keypair.pubkey())
-                balance_sol = balance_response.value / 1_000_000_000  # Converter de lamports para SOL
-            except Exception as e:
-                balance_sol = f"erro_ao_consultar: {str(e)}"
-        else:
-            balance_sol = "simulacao"
+        # Get balance using direct RPC call
+        balance_sol = "simulacao"
+        balance_lamports = "N/A"
+        
+        # Debug configuration values
+        print(f"Debug - USE_REAL_TRANSACTIONS: {USE_REAL_TRANSACTIONS}")
+        print(f"Debug - WALLET_CONFIGURED: {WALLET_CONFIGURED}")
+        print(f"Debug - ACTIVE_NETWORK: {ACTIVE_NETWORK}")
+        
+        # Force balance check for debugging (remove USE_REAL_TRANSACTIONS condition temporarily)
+        try:
+            print(f"Consultando saldo para: {wallet_address}")
+            
+            # Direct RPC call to get balance
+            RPC_URL = "https://api.devnet.solana.com"
+            payload = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "getBalance",
+                "params": [wallet_address]
+            }
+            
+            json_data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(
+                RPC_URL,
+                data=json_data,
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            with urllib.request.urlopen(req) as response:
+                balance_data = json.loads(response.read().decode('utf-8'))
+            
+            print(f"RPC Balance response: {balance_data}")
+            
+            if "result" in balance_data and "value" in balance_data["result"]:
+                balance_lamports = balance_data["result"]["value"]
+                balance_sol = balance_lamports / 1_000_000_000
+                print(f"Balance: {balance_lamports} lamports = {balance_sol} SOL")
+            else:
+                balance_sol = "erro_rpc_response"
+                balance_lamports = "erro_rpc_response"
+                
+        except Exception as e:
+            print(f"Erro ao consultar saldo via RPC: {str(e)}")
+            balance_sol = f"erro_rpc: {str(e)}"
+            balance_lamports = f"erro_rpc: {str(e)}"
 
         return {
             "status": "sucesso",
             "carteira": {
                 "endereco": wallet_address,
                 "saldo_sol": balance_sol,
+                "saldo_lamports": balance_lamports,
                 "rede": ACTIVE_NETWORK,
                 "transacoes_reais": USE_REAL_TRANSACTIONS,
-                "modo": "real" if USE_REAL_TRANSACTIONS else "simulacao"
+                "modo": "real" if USE_REAL_TRANSACTIONS else "simulacao",
+                "debug_info": {
+                    "wallet_configured": WALLET_CONFIGURED,
+                    "use_real_transactions": USE_REAL_TRANSACTIONS,
+                    "active_network": ACTIVE_NETWORK
+                }
             },
             "custos": {
                 "transacao_memo": "~0.000005 SOL",
