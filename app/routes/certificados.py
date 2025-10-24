@@ -32,7 +32,7 @@ class CertificadoVerificacao(BaseModel):
     time: str
 
 
-@router.post("/registrar")
+@router.post("/register")
 async def registrar_certificado(request: CertificadoRequest):
     """
     Registra um certificado na blockchain Solana usando JSON canonizado.
@@ -99,7 +99,7 @@ async def registrar_certificado(request: CertificadoRequest):
         )
 
 
-@router.post("/verificar/{txid}")
+@router.post("/verify/{txid}")
 async def verificar_certificado(txid: str, certificado_data: CertificadoVerificacao):
     """
     Verifica um certificado na blockchain Solana comparando o hash.
