@@ -401,25 +401,62 @@ class CertificadosSolanaPy {
             justify-content: center; z-index: 1000; backdrop-filter: blur(5px);
         `;
         
+        // Extract wallet info from nested response structure
+        const wallet = data.carteira || {};
+        const costs = data.custos || {};
+        const instructions = data.instrucoes || {};
+        
+        const walletAddress = wallet.endereco || 'N/A';
+        const network = wallet.rede || 'N/A';
+        const balance = wallet.saldo_sol !== undefined ? wallet.saldo_sol.toFixed(6) : 'N/A';
+        const mode = wallet.modo || 'N/A';
+        const realTransactions = wallet.transacoes_reais ? 'Sim' : 'Não';
+        
         modal.innerHTML = `
             <div style="background: var(--card-bg); border-radius: 24px; padding: 2rem; 
-                        max-width: 500px; width: 90%; border: 1px solid var(--border-color);
+                        max-width: 600px; width: 90%; border: 1px solid var(--border-color);
                         box-shadow: var(--shadow-lg);">
-                <h3 style="color: var(--text-primary); margin-bottom: 1.5rem; 
+                <h3 style="color: var(--text-primary); margin-bottom: 1.5rem; font-size: 1.5rem;
                           background: var(--solana-gradient); -webkit-background-clip: text;
                           -webkit-text-fill-color: transparent; background-clip: text;">
                     💼 Informações da Carteira
                 </h3>
-                <div style="color: var(--text-secondary); line-height: 1.6;">
-                    <p><strong>Endereço:</strong> ${data.wallet_address || 'N/A'}</p>
-                    <p><strong>Rede:</strong> ${data.network || 'N/A'}</p>
-                    <p><strong>Saldo:</strong> ${data.balance || 'N/A'} SOL</p>
-                    <p><strong>Status:</strong> ${data.status || 'N/A'}</p>
+                <div style="color: var(--text-secondary); line-height: 1.8; font-size: 0.95rem;">
+                    <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
+                        <p style="margin-bottom: 0.5rem;"><strong style="color: var(--text-primary);">Endereço:</strong></p>
+                        <p style="word-break: break-all; font-family: monospace; font-size: 0.85em; background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 6px; margin: 0;">${walletAddress}</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
+                        <p style="margin-bottom: 0.5rem;"><strong style="color: var(--text-primary);">Saldo:</strong> 
+                            <span style="color: #00d4aa; font-weight: 600;">${balance} SOL</span>
+                        </p>
+                        <p style="margin-bottom: 0.5rem;"><strong style="color: var(--text-primary);">Rede:</strong> 
+                            <span style="text-transform: uppercase; color: #9945ff;">${network}</span>
+                        </p>
+                        <p style="margin-bottom: 0;"><strong style="color: var(--text-primary);">Modo:</strong> 
+                            <span style="color: ${mode === 'simulacao' ? '#ffa500' : '#00d4aa'};">${mode}</span>
+                        </p>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
+                        <p style="margin-bottom: 0.5rem;"><strong style="color: var(--text-primary);">Transações Reais:</strong> ${realTransactions}</p>
+                        <p style="margin-bottom: 0;"><strong style="color: var(--text-primary);">Custo por Transação:</strong> ${costs.transacao_memo || 'N/A'}</p>
+                    </div>
+                    
+                    ${instructions.obter_sol ? `
+                    <div style="background: rgba(153, 69, 255, 0.1); padding: 0.75rem; border-radius: 8px; border-left: 3px solid #9945ff;">
+                        <p style="margin: 0; font-size: 0.9em;"><strong>💡 Dica:</strong> ${instructions.obter_sol}</p>
+                    </div>
+                    ` : ''}
                 </div>
                 <button onclick="this.closest('.modal').remove()" 
                         style="margin-top: 1.5rem; background: var(--solana-gradient); 
                                color: white; border: none; padding: 0.75rem 1.5rem; 
-                               border-radius: 8px; cursor: pointer; width: 100%;">
+                               border-radius: 8px; cursor: pointer; width: 100%; 
+                               font-weight: 600; transition: opacity 0.2s; font-size: 1rem;"
+                        onmouseover="this.style.opacity='0.9'"
+                        onmouseout="this.style.opacity='1'">
                     Fechar
                 </button>
             </div>
@@ -434,6 +471,7 @@ class CertificadosSolanaPy {
         const container = document.getElementById('register-result-container');
         const cert = response.certificado;
         const blockchain = response.blockchain;
+        const jsonCanonical = cert.json_canonico || response.json_canonico;
         
         container.innerHTML = `
             <div class="result-card">
@@ -449,19 +487,19 @@ class CertificadosSolanaPy {
                 
                 <div class="result-field">
                     <div class="result-label">Hash SHA-256</div>
-                    <div class="result-value">${cert.hash_sha256}</div>
+                    <div class="result-value" style="word-break: break-all; font-family: monospace;">${cert.hash_sha256}</div>
                 </div>
                 
                 <div class="result-field">
                     <div class="result-label">Transaction ID</div>
-                    <div class="result-value">${cert.txid_solana}</div>
+                    <div class="result-value" style="word-break: break-all; font-family: monospace;">${cert.txid_solana}</div>
                 </div>
                 
                 <div class="result-field">
                     <div class="result-label">Explorer Solana</div>
                     <div class="result-value">
                         <a href="${blockchain.explorer_url}" target="_blank" class="result-link">
-                            Ver na Blockchain →
+                            🔗 Ver na Blockchain →
                         </a>
                     </div>
                 </div>
@@ -470,6 +508,17 @@ class CertificadosSolanaPy {
                     <div class="result-label">Timestamp</div>
                     <div class="result-value">${cert.timestamp}</div>
                 </div>
+                
+                ${jsonCanonical ? `
+                <div class="result-field">
+                    <div class="result-label">JSON Canônico</div>
+                    <div class="result-value">
+                        <pre style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px; 
+                                    overflow-x: auto; font-family: monospace; font-size: 0.85em; 
+                                    margin: 0; border: 1px solid var(--border-color);">${JSON.stringify(jsonCanonical, null, 2)}</pre>
+                    </div>
+                </div>
+                ` : ''}
             </div>
         `;
     }
@@ -483,7 +532,7 @@ class CertificadosSolanaPy {
                 <div class="result-header">
                     <h3 style="color: var(--text-primary);">Resultado da Verificação</h3>
                     <span class="result-status ${isSuccess ? 'success' : 'error'}">
-                        ${isSuccess ? '✅ Válido' : '❌ Inválido'}
+                        ${isSuccess ? 'Válido' : 'Inválido'}
                     </span>
                 </div>
                 
