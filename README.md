@@ -8,6 +8,7 @@ Sistema profissional para emissão e verificação de certificados autenticados 
 - JSON canonizado para garantir integridade de dados
 - Hash SHA-256 para verificação de autenticidade
 - API REST completa com FastAPI
+- **Interface web moderna inspirada no Solana**
 - Interface de documentação automática (Swagger)
 - Suporte para carteiras personalizadas do usuário
 - Modo simulação para desenvolvimento sem custos
@@ -25,6 +26,12 @@ certificates-on-solana/
 │   └── services/
 │       ├── blockchain.py    # Integração com Solana
 │       └── hashing.py       # Funções de hash SHA-256
+├── frontend/
+│   ├── index.html          # Interface web principal
+│   ├── css/
+│   │   └── main.css        # Estilos com tema Solana
+│   └── js/
+│       └── main.js         # Aplicação JavaScript vanilla
 ├── wallet/
 │   ├── README.md           # Guia de configuração de carteira
 │   └── .gitignore          # Proteção de arquivos sensíveis
@@ -35,6 +42,8 @@ certificates-on-solana/
 ## Tecnologias Utilizadas
 
 - **Framework Backend**: FastAPI
+- **Frontend**: HTML5, CSS3, JavaScript Vanilla
+- **Design**: Interface inspirada no Solana (gradientes roxo/verde)
 - **Blockchain**: Solana (testnet/mainnet)
 - **Hashing**: SHA-256 nativo (hashlib)
 - **Servidor ASGI**: Uvicorn
@@ -73,6 +82,7 @@ pip install solana solders
 
 ### 4. Executar a Aplicação
 
+#### Backend (API)
 ```bash
 # Método recomendado
 python run.py
@@ -80,6 +90,46 @@ python run.py
 # Alternativo com uvicorn
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
+
+#### Frontend (Interface Web)
+```bash
+# Em outro terminal, navegue até a pasta frontend
+cd frontend
+
+# Inicie um servidor HTTP local
+python3 -m http.server 8080
+
+# Ou use Node.js se preferir
+npx serve -s . -l 8080
+```
+
+### 5. Acessar o Sistema
+
+- **Interface Web**: http://localhost:8080
+- **API Backend**: http://localhost:8000
+- **Documentação API**: http://localhost:8000/docs
+
+## Interface Web
+
+A interface web oferece uma experiência moderna e intuitiva:
+
+### Características do Frontend
+- 🎨 **Design Solana**: Identidade visual com gradientes roxo/verde característicos
+- 📱 **Responsivo**: Funciona perfeitamente em desktop e mobile  
+- 🔄 **SPA**: Single Page Application com navegação fluida
+- ⚡ **Vanilla JS**: Sem frameworks, JavaScript puro para máxima performance
+- 💫 **Animações**: Transições suaves e feedback visual
+
+### Funcionalidades Disponíveis
+1. **📝 Registrar Certificado**: Formulário para registrar novos certificados
+2. **✅ Verificar Certificado**: Interface para verificar autenticidade
+3. **💼 Wallet Info**: Visualizar informações da carteira Solana
+
+### Navegação
+- Clique nos botões da navegação para alternar entre funcionalidades
+- Formulários com validação em tempo real
+- Alertas e feedback visual para todas as ações
+- Resultados detalhados com links para o Solana Explorer
 
 ## Uso da API
 
@@ -91,7 +141,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 #### Registrar Certificado
 ```bash
-POST /certificados/registrar
+POST /certificados/register
 Content-Type: application/json
 
 {
@@ -102,33 +152,30 @@ Content-Type: application/json
 }
 ```
 
-#### Validar Hash (sem registrar)
+#### Verificar Certificado
 ```bash
-POST /certificados/validar-hash
+POST /certificados/verify/{txid}
 Content-Type: application/json
 
 {
-  "name": "João Silva",
-  "event": "Curso de Python", 
-  "document": "12345678901",
-  "duration_hours": 40
+  "event": "PlythonFloripa 25/10/2025",
+  "uuid": "173146f8-5a92-4f57-98ee-fd629f3a92a0",
+  "name": "Samuel Richard miranda da silva",
+  "document": "08625155956",
+  "duration_hours": 5,
+  "time": "2025-10-24T12:56:37.161876"
 }
-```
-
-#### Verificar Transação
-```bash
-GET /certificados/verificar/{txid}
 ```
 
 #### Informações da Carteira
 ```bash
-GET /certificados/wallet-info
+POST /certificados/wallet-info
 ```
 
 ### Exemplo com cURL
 
 ```bash
-curl -X POST "http://localhost:8000/certificados/registrar" \
+curl -X POST "http://localhost:8000/certificados/register" \
      -H "Content-Type: application/json" \
      -d '{
        "name": "David Richard",
@@ -199,12 +246,50 @@ logging.basicConfig(
 
 ## Solução de Problemas
 
-### Bibliotecas Solana não encontradas
+### Frontend
+
+#### Tela em Branco
+```bash
+# Verifique se os arquivos existem:
+ls frontend/
+# Deve mostrar: index.html, css/, js/
+
+# Verifique se o servidor está rodando na pasta correta:
+cd frontend
+python3 -m http.server 8080
+
+# Acesse: http://localhost:8080
+```
+
+#### Erros no Console do Navegador
+```bash
+# Abra F12 no navegador e verifique:
+# - Se os arquivos CSS e JS estão carregando
+# - Se há erros de JavaScript
+# - Se a API está rodando em localhost:8000
+```
+
+#### Erro de CORS
+Se houver problemas de CORS entre frontend e backend, adicione no backend:
+```python
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+### Backend
+
+#### Bibliotecas Solana não encontradas
 ```bash
 pip install solana solders
 ```
 
-### Porta em uso
+#### Porta em uso
 ```bash
 # Linux/Mac
 lsof -ti:8000 | xargs kill -9
@@ -214,7 +299,7 @@ netstat -ano | findstr :8000
 taskkill /PID <PID> /F
 ```
 
-### Erro de carteira
+#### Erro de carteira
 Consulte o [Guia de Carteira](wallet/README.md) para configuração correta.
 
 ## Desenvolvimento

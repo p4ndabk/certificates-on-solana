@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificados Solana Py</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-container">
+                <div class="header-brand">
+                    <div class="logo">
+                        <div class="logo-icon">🔗</div>
+                        <h1>Certificados Solana Py</h1>
+                    </div>
+                    <p class="tagline">Certificados autenticados na blockchain Solana</p>
+                </div>
+                <div class="wallet-status" id="wallet-status">
+                    <button class="btn-wallet" id="wallet-info-btn">
+                        <span class="wallet-icon"></span>
+                        Wallet Info
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-container">
+                <div class="nav-menu">
+                    <button class="nav-item active" data-page="register">
+                        <span class="nav-icon"></span>
+                        Registrar Certificado
+                    </button>
+                    <button class="nav-item" data-page="verify">
+                        <span class="nav-icon"></span>
+                        Verificar Certificado
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Register Page -->
+            <div id="register-page" class="page active">
+                <!-- Content will be loaded here -->
+            </div>
+
+            <!-- Verify Page -->
+            <div id="verify-page" class="page">
+                <!-- Content will be loaded here -->
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-container">
+                <p>&copy; 2025 Certificados Solana Py - Desenvolvido com ❤️ usando FastAPI e Solana</p>
+                <div class="footer-links">
+                    <a href="https://explorer.solana.com" target="_blank">Solana Explorer</a>
+                    <a href="http://localhost:8000/docs" target="_blank">API Docs</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
