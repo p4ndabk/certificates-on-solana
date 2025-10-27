@@ -33,11 +33,9 @@ def setup_logging():
         ]
     )
     
-    # Reduzir verbosidade de bibliotecas externas
     logging.getLogger("solana").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-# Configurar logging quando o módulo for importado
 setup_logging()
 APP_VERSION = "1.0.0"
 APP_DESCRIPTION = "Sistema de emissão de certificados autenticados na blockchain Solana"
