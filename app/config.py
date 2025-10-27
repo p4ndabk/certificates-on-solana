@@ -17,7 +17,7 @@ SOLANA_DEVNET_URL = SOLANA_TESTNET_URL if SOLANA_NETWORK == "testnet" else SOLAN
 
 # Configurações do certificado
 CERTIFICATE_TITLE = "Certificado de Participação"
-CERTIFICATE_ISSUER = "Sistema de Certificados Blockchain"
+CERTIFICATE_ISSUER = "Sistema de Certificados Blockchain Python Floripa"
 
 # Configurações da aplicação
 APP_NAME = "Certificados na Solana"

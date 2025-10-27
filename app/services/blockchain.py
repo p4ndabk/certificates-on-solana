@@ -70,18 +70,38 @@ class SolanaCertificateRegistry:
         except Exception as e:
             logger.error(f"Erro ao carregar carteira: {e}")
             return None
-    
-    def _create_metadata(self, certificado_hash: str, nome_participante: str, evento: str) -> str:
+        
+    def mask_name(self, nome: str) -> str:
+        partes = nome.split()
+        if not partes:
+            return ""
+        primeiro = partes[0][:2]
+        ultimo = partes[-1][-2:]
+        return f"{primeiro}****{ultimo}"
+
+    def mask_email(self, email: str) -> str:
+        try:
+            local, dominio = email.split("@")
+            local_mask = local[:2] + "*" + local[-1] if len(local) > 3 else local[0] + "*"
+            dominio_parts = dominio.split(".")
+            dominio_mask = dominio[0][0] + "**" + dominio_parts[-1] if dominio_parts else "g**br"
+            return f"{local_mask}@{dominio_mask}"
+        except Exception:
+            return "mascarado"
+
+    def _create_metadata(self, certificado_hash: str, nome_participante: str, evento: str, codigo_certificado: str, email_participante: str) -> str:
         """Cria e otimiza metadados do certificado"""
         metadata = {
             "version": "1.0",
             "tipo": "certificado_participacao",
-            "participante": nome_participante,
+            "code": codigo_certificado,
+            "name": self.mask_name(nome_participante),
+            "email": self.mask_email(email_participante),
             "evento": evento,
             "timestamp": int(time.time()),
             "doc_hash": certificado_hash,
             "network": self.network,
-            "emissor": "Sistema de Certificados Blockchain"
+            "emissor": "Sistema de Certificados Blockchain"            
         }
         
         memo_data = json.dumps(metadata, ensure_ascii=False, separators=(',', ':'))
@@ -128,23 +148,8 @@ class SolanaCertificateRegistry:
             return VersionedTransaction(message, [self.keypair])
             
         except Exception as e:
-            logger.warning(f"Método moderno falhou: {e}, tentando legado...")
-            # Fallback para método legado
-            try:
-                from solana.transaction import Transaction as SolanaTransaction
-                
-                transaction = SolanaTransaction(
-                    fee_payer=self.keypair.pubkey(),
-                    instructions=[instruction],
-                    recent_blockhash=recent_blockhash
-                )
-                transaction.sign(self.keypair)
-                return transaction
-            except Exception as e2:
-                logger.error(f"Ambos métodos falharam: {e2}")
-                raise Exception(f"Erro na criação da transação: {str(e)} | Fallback: {str(e2)}")
+            logger.warning(f"Erro ao criar transação VersionedTransaction: {e}, tentando método alternativo.")
 
-    
     async def _ensure_balance_for_devnet(self):
         """Garante saldo na devnet via airdrop se necessário"""
         if not self.keypair or self.network != "devnet":
@@ -166,27 +171,16 @@ class SolanaCertificateRegistry:
         base58_alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
         import random
         return ''.join(random.choice(base58_alphabet) for _ in range(88))
-    
-    async def register_certificate(self, certificado_hash: str, nome_participante: str, evento: str = "Evento Geral") -> str:
+
+    async def register_certificate(self, certificado_hash: str, nome_participante: str, evento: str = "Evento Geral", codigo_certificado: str = "Código do Certificado", email_participante: str = "email@exemplo.com") -> str:
         """Registra certificado na blockchain com fallback automático"""
-        # Simulação total se Solana não disponível
-        if not SOLANA_AVAILABLE:
-            logger.warning("Bibliotecas Solana não disponíveis - usando simulação")
-            await asyncio.sleep(0.5)
-            return self._generate_simulated_txid()
-        
-        # Simulação se configuração incompleta
-        if not self.client or not self.keypair:
-            logger.info("Cliente/carteira não configurados - usando simulação")
-            await asyncio.sleep(0.5)
-            return self._generate_simulated_txid()
-        
+                
         try:
             # Garante saldo na devnet
             await self._ensure_balance_for_devnet()
             
             # Cria metadados e transação
-            memo_data = self._create_metadata(certificado_hash, nome_participante, evento)
+            memo_data = self._create_metadata(certificado_hash, nome_participante, evento, codigo_certificado, email_participante)
             logger.debug(f"Tamanho do memo: {len(memo_data.encode('utf-8'))} bytes")
             
             transaction = self._create_transaction(memo_data)
@@ -201,57 +195,14 @@ class SolanaCertificateRegistry:
             
         except Exception as e:
             logger.error(f"Erro no registro: {e}")
-            logger.info("Usando fallback simulado...")
-            await asyncio.sleep(0.5)
-            return self._generate_simulated_txid()
-
 
 # Instância global
 _registry = SolanaCertificateRegistry()
 
 
-async def registrar_hash_solana(certificado_hash: str, nome_participante: str = "Participante", evento: str = "Evento Geral") -> str:
+async def registrar_hash_solana(certificado_hash: str, nome_participante: str = "Participante", evento: str = "Evento Geral", codigo_certificado: str = "Código do Certificado", email_participante: str = "email@exemplo.com") -> str:
     """Registra o hash do certificado na blockchain Solana"""
-    return await _registry.register_certificate(certificado_hash, nome_participante, evento)
-
-
-async def verificar_transacao(txid: str) -> Optional[dict]:
-    """Verifica se uma transação existe na blockchain Solana"""
-    try:
-        await asyncio.sleep(0.3)
-        
-        if SOLANA_AVAILABLE and _registry.client:
-            try:
-                response = _registry.client.get_transaction(txid)
-                if response.value:
-                    logger.info(f"Transação encontrada na blockchain! TXID: {txid}")
-                    return {
-                        "txid": txid,
-                        "slot": response.value.slot,
-                        "block_time": response.value.block_time,
-                        "status": "confirmed",
-                        "network": _registry.network,
-                        "explorer_url": f"https://explorer.solana.com/tx/{txid}?cluster={_registry.network}",
-                        "timestamp": response.value.block_time or int(time.time()),
-                        "verificacao": "blockchain_real"
-                    }
-            except Exception as e:
-                logger.warning(f"Erro ao verificar na blockchain: {e}")
-        
-        # Fallback simulado
-        return {
-            "txid": txid,
-            "status": "confirmed",
-            "network": _registry.network,
-            "explorer_url": f"https://explorer.solana.com/tx/{txid}?cluster={_registry.network}",
-            "timestamp": int(time.time()),
-            "verificacao": "simulada" if not SOLANA_AVAILABLE else "conectado_mas_nao_encontrado"
-        }
-        
-    except Exception as e:
-        logger.error(f"Erro ao verificar transação: {str(e)}")
-        return None
-
+    return await _registry.register_certificate(certificado_hash, nome_participante, evento, codigo_certificado, email_participante)
 
 async def obter_info_rede() -> dict:
     """Obtém informações básicas da rede Solana"""

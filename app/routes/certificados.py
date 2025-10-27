@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from ..services.hashing import gerar_hash_texto
-from ..services.blockchain import registrar_hash_solana, verificar_transacao, obter_info_rede
+from ..services.blockchain import registrar_hash_solana, obter_info_rede
 
 router = APIRouter(prefix="/certificados", tags=["certificados"])
 
@@ -19,16 +19,16 @@ router = APIRouter(prefix="/certificados", tags=["certificados"])
 class CertificadoRequest(BaseModel):
     name: str
     event: str
-    document: str  # CPF ou documento de identificação
-    duration_hours: int  # Horas de duração do evento/curso
+    email: str
+    certificate_code: str
 
 
 class CertificadoVerificacao(BaseModel):
     event: str
     uuid: str
     name: str
-    document: str
-    duration_hours: int
+    email: str
+    certificate_code: str
     time: str
 
 
@@ -52,25 +52,24 @@ async def registrar_certificado(request: CertificadoRequest):
             "event": request.event,
             "uuid": certificate_uuid,
             "name": request.name,
-            "document": request.document,
-            "duration_hours": request.duration_hours,
+            "email": request.email,
+            "certificate_code": request.certificate_code,
             "time": current_time.isoformat()
         }
 
         json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
         certificado_hash = gerar_hash_texto(json_canonico)
 
-        txid_solana = await registrar_hash_solana(certificado_hash, request.name, request.event)
+        txid_solana = await registrar_hash_solana(certificado_hash, request.name, request.event, request.certificate_code, request.email)
         print(f"Certificado hash: {certificado_hash}")
         return {
             "status": "sucesso",
             "certificado": {
                 "event": request.event,
                 "name": request.name,
-                "document": request.document,
+                "email": request.email,
                 "uuid": certificate_uuid,
                 "time": current_time.isoformat(),
-                "duration_hours": request.duration_hours,  # Horas de duração do evento
                 "json_canonico": certificate_data,
                 "hash_sha256": certificado_hash,
                 "txid_solana": txid_solana,
@@ -160,8 +159,8 @@ async def verificar_certificado(txid: str, certificado_data: CertificadoVerifica
                 "event": certificado_data.event,
                 "uuid": certificado_data.uuid,
                 "name": certificado_data.name,
-                "document": certificado_data.document,
-                "duration_hours": certificado_data.duration_hours,
+                "email": certificado_data.email,
+                "certificate_code": certificado_data.certificate_code,
                 "time": certificado_data.time
             }
 
@@ -172,7 +171,6 @@ async def verificar_certificado(txid: str, certificado_data: CertificadoVerifica
 
             return {
                 "status": "encontrado",
-                "transacao": transaction_result,
                 "txid": txid,
                 "rede": "Solana Devnet",
                 "explorer_url": f"https://explorer.solana.com/tx/{txid}?cluster=devnet",
