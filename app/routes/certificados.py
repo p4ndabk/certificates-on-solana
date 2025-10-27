@@ -49,11 +49,11 @@ async def registrar_certificado(request: CertificadoRequest):
         current_time = datetime.now()
 
         certificate_data = {
-            "event": request.event,
-            "uuid": certificate_uuid,
-            "name": request.name,
-            "email": request.email,
-            "certificate_code": request.certificate_code,
+            "event": request.event.lower(),
+            "uuid": certificate_uuid.lower(),
+            "name": request.name.lower(),
+            "email": request.email.lower(),
+            "certificate_code": request.certificate_code.lower(),
             "time": current_time.isoformat()
         }
 
@@ -156,11 +156,11 @@ async def verificar_certificado(txid: str, certificado_data: CertificadoVerifica
 
             # Generate hash from provided certificate data
             certificate_dict = {
-                "event": certificado_data.event,
-                "uuid": certificado_data.uuid,
-                "name": certificado_data.name,
-                "email": certificado_data.email,
-                "certificate_code": certificado_data.certificate_code,
+                "event": certificado_data.event.lower(),
+                "uuid": certificado_data.uuid.lower(),
+                "name": certificado_data.name.lower(),
+                "email": certificado_data.email.lower(),
+                "certificate_code": certificado_data.certificate_code.lower(),
                 "time": certificado_data.time
             }
 
