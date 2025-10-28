@@ -1,41 +1,37 @@
 """
-Configurações globais da aplicação de certificados na Solana
+Configurações centralizadas da aplicação
 """
 
-import logging
-import sys
+import os
+from pathlib import Path
 
-# Configurações da Solana
-# TESTNET (gratuito - para desenvolvimento)
-SOLANA_TESTNET_URL = "https://api.testnet.solana.com"
-# MAINNET (real - requer SOL)
-SOLANA_MAINNET_URL = "https://api.mainnet-beta.solana.com"
+from dotenv import load_dotenv
 
-# Escolher rede (mude para 'mainnet' para transações reais)
-SOLANA_NETWORK = "testnet"  # Mude para "mainnet" quando quiser usar SOL real
-SOLANA_DEVNET_URL = SOLANA_TESTNET_URL if SOLANA_NETWORK == "testnet" else SOLANA_MAINNET_URL
+BASE_DIR = Path(__file__).resolve().parent.parent
+env_file = BASE_DIR / '.env'
 
-# Configurações do certificado
-CERTIFICATE_TITLE = "Certificado de Participação"
-CERTIFICATE_ISSUER = "Sistema de Certificados Blockchain Python Floripa"
+if env_file.exists():
+    load_dotenv(env_file)
+    print(f".env carregado de: {env_file}")
+else:
+    print(f".env não encontrado em: {env_file}")
 
-# Configurações da aplicação
-APP_NAME = "Certificados na Solana"
+# Criar diretório de wallet
+WALLET_DIR = BASE_DIR / "wallet"
+WALLET_DIR.mkdir(exist_ok=True)
 
-# Configuração de logging
-def setup_logging():
-    """Configura o sistema de logging da aplicação"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-        ]
-    )
-    
-    logging.getLogger("solana").setLevel(logging.WARNING)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-
-setup_logging()
+# Informações da Aplicação
+APP_NAME = "Certificates on Solana"
 APP_VERSION = "1.0.0"
-APP_DESCRIPTION = "Sistema de emissão de certificados autenticados na blockchain Solana"
+APP_DESCRIPTION = "Sistema de Registro de Certificados na Blockchain Solana"
+
+# Configuração Solana - Lendo do .env
+SOLANA_NETWORK = os.getenv("SOLANA_NETWORK", "devnet")
+SOLANA_URL = os.getenv("SOLANA_URL", "https://api.devnet.solana.com")
+SOLANA_WALLET_PATH = Path(os.getenv("SOLANA_WALLET_PATH", str(WALLET_DIR / "certificates_wallet.json")))
+
+print(f"\n═══════════════════════════════════════════════════════")
+print(f"✓ SOLANA_NETWORK: {SOLANA_NETWORK}")
+print(f"✓ SOLANA_URL: {SOLANA_URL}")
+print(f"✓ SOLANA_WALLET_PATH: {SOLANA_WALLET_PATH}")
+print(f"═══════════════════════════════════════════════════════\n")

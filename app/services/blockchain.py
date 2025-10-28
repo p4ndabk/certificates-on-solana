@@ -6,7 +6,9 @@ import time
 import json
 import logging
 from typing import Optional
-from ..config import SOLANA_DEVNET_URL
+
+# Importar config PRIMEIRO (que já carregou o .env)
+from ..config import SOLANA_NETWORK, SOLANA_URL, SOLANA_WALLET_PATH
 from ..wallet_config import (
     USE_REAL_TRANSACTIONS, WALLET_PATH, RPC_URL, ACTIVE_NETWORK, 
     WALLET_CONFIGURED, REQUIRE_MANUAL_SETUP
@@ -196,6 +198,7 @@ class SolanaCertificateRegistry:
         except Exception as e:
             logger.error(f"Erro no registro: {e}")
 
+
 # Instância global
 _registry = SolanaCertificateRegistry()
 
@@ -217,29 +220,16 @@ async def obter_info_rede() -> dict:
             "explorer": f"https://explorer.solana.com/?cluster={_registry.network}"
         }
         
-        if SOLANA_AVAILABLE:
-            return {
-                **base_info,
-                "status": "connected",
-                "biblioteca_solana": "instalada",
-                "modo": "blockchain_real_gratuita",
-                "airdrop_disponivel": _registry.network == "devnet"
-            }
-        else:
-            return {
-                **base_info,
-                "status": "simulado",
-                "biblioteca_solana": "nao_instalada",
-                "modo": "simulacao",
-                "instrucoes": "Execute 'pip install solana solders' para registro real GRATUITO na devnet"
-            }
+        return {
+            **base_info,
+            "status": "connected",
+            "biblioteca_solana": "instalada",
+            "modo": "blockchain_real_gratuita",
+            "airdrop_disponivel": _registry.network == "devnet"
+        }
         
     except Exception as e:
-        return {
-            "network": "testnet",
-            "error": str(e),
-            "status": "error"
-        }
+        logger.error(f"Erro ao obter info da rede: {e}")
 
 
 # Compatibilidade com código existente
