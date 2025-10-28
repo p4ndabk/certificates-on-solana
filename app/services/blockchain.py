@@ -114,12 +114,12 @@ class SolanaCertificateRegistry:
         metadata = {
             "version": "1.0",
             "tipo": "certificado_participacao",
-            "code": codigo_certificado,
-            "name": self.mask_name(nome_participante),
-            "email": self.mask_email(email_participante),
-            "evento": evento,
+            "code": codigo_certificado.lower(),
+            "name": self.mask_name(nome_participante).lower(),
+            "email": self.mask_email(email_participante).lower(),
+            "evento": evento.lower(),
             "timestamp": int(time.time()),
-            "doc_hash": certificado_hash,
+            "doc_hash": certificado_hash.lower(),
             "network": self.network,
             "emissor": "Sistema de Certificados Blockchain"            
         }
