@@ -114,3 +114,37 @@ MIT License
 3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
 4. Push para a branch (`git push origin feature/AmazingFeature`)
 5. Abra um Pull Request
+
+## 🧪 Testes
+
+### Executando os Testes
+
+```bash
+# Instalar dependências de teste
+pip install -r requirements.txt
+
+# Executar todos os testes
+pytest -v
+
+# Executar testes específicos
+pytest tests/test_verify.py -v
+pytest tests/test_register.py -v
+```
+
+### Cenários de Teste
+
+1. Verificação de certificado válido
+2. Verificação com dados modificados
+3. Verificação de TXID inexistente
+4. Registro de novo certificado
+5. Validação de payload incompleto
+
+### Estrutura dos Testes
+
+```
+tests/
+├── __init__.py
+├── conftest.py          # Configurações de teste
+├── test_register.py     # Testes de registro
+└── test_verify.py       # Testes de verificação
+```

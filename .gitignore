@@ -263,8 +263,8 @@ generated_certificates/
 
 # FastAPI specific
 .pytest_cache/
-test_*.py
 *_test.py
+tests/test_wallet/
 
 # Project specific
 uploads/
