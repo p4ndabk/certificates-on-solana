@@ -1,41 +1,33 @@
 """
-Configurações globais da aplicação de certificados na Solana
+Configurações centralizadas da aplicação
 """
 
-import logging
-import sys
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 
-# Configurações da Solana
-# TESTNET (gratuito - para desenvolvimento)
-SOLANA_TESTNET_URL = "https://api.testnet.solana.com"
-# MAINNET (real - requer SOL)
-SOLANA_MAINNET_URL = "https://api.mainnet-beta.solana.com"
+# Configuração de diretórios
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Escolher rede (mude para 'mainnet' para transações reais)
-SOLANA_NETWORK = "testnet"  # Mude para "mainnet" quando quiser usar SOL real
-SOLANA_DEVNET_URL = SOLANA_TESTNET_URL if SOLANA_NETWORK == "testnet" else SOLANA_MAINNET_URL
+# Carregar .env
+load_dotenv(BASE_DIR / '.env')
 
-# Configurações do certificado
-CERTIFICATE_TITLE = "Certificado de Participação"
-CERTIFICATE_ISSUER = "Sistema de Certificados Blockchain Python Floripa"
-
-# Configurações da aplicação
-APP_NAME = "Certificados na Solana"
-
-# Configuração de logging
-def setup_logging():
-    """Configura o sistema de logging da aplicação"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-        ]
-    )
-    
-    logging.getLogger("solana").setLevel(logging.WARNING)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-
-setup_logging()
+# Informações da Aplicação
+APP_NAME = "Certificates on Solana"
 APP_VERSION = "1.0.0"
-APP_DESCRIPTION = "Sistema de emissão de certificados autenticados na blockchain Solana"
+APP_DESCRIPTION = "Sistema de Registro de Certificados na Blockchain Solana"
+
+# Configuração Solana
+SOLANA_NETWORK = os.getenv("SOLANA_NETWORK", "devnet")
+SOLANA_URL = os.getenv("SOLANA_URL", "https://api.devnet.solana.com")
+
+# Configuração da carteira
+SOLANA_WALLET_PATH = BASE_DIR / os.getenv("SOLANA_WALLET_PATH", "wallet/certificates-wallet.json")
+SOLANA_WALLET_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+# Log simplificado
+print(f"\n═══ Configuração Solana ═══")
+print(f"Network: {SOLANA_NETWORK}")
+print(f"URL: {SOLANA_URL}")
+print(f"Wallet: {SOLANA_WALLET_PATH}")
+print(f"Wallet exists: {SOLANA_WALLET_PATH.exists()}\n")

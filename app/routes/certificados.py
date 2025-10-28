@@ -6,12 +6,20 @@ import json
 import uuid
 import urllib.request
 import urllib.parse
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
+from pathlib import Path
 
 from ..services.hashing import gerar_hash_texto
 from ..services.blockchain import registrar_hash_solana, obter_info_rede
+
+# Importar config APÓS ela ter carregado o .env
+from ..config import SOLANA_NETWORK, SOLANA_URL, SOLANA_WALLET_PATH
+from ..wallet_config import USE_REAL_TRANSACTIONS, ACTIVE_NETWORK, WALLET_CONFIGURED
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/certificados", tags=["certificados"])
 
@@ -62,6 +70,7 @@ async def registrar_certificado(request: CertificadoRequest):
 
         txid_solana = await registrar_hash_solana(certificado_hash, request.name, request.event, request.certificate_code, request.email)
         print(f"Certificado hash: {certificado_hash}")
+        
         return {
             "status": "sucesso",
             "certificado": {
@@ -73,19 +82,19 @@ async def registrar_certificado(request: CertificadoRequest):
                 "json_canonico": certificate_data,
                 "hash_sha256": certificado_hash,
                 "txid_solana": txid_solana,
-                "network": "testnet",
+                "network": SOLANA_NETWORK,
                 "timestamp": current_time.isoformat(),
                 "timestamp_unix": int(current_time.timestamp())
             },
             "blockchain": {
-                "rede": "Solana Devnet",
-                "explorer_url": f"https://explorer.solana.com/tx/{txid_solana}?cluster=devnet",
-                "verificacao_url": f"http://localhost:8000/certificados/verificar/{txid_solana}",
+                "rede": f"Solana {SOLANA_NETWORK.title()}",
+                "explorer_url": f"https://explorer.solana.com/tx/{txid_solana}?cluster={SOLANA_NETWORK}",
+                "verificacao_url": f"http://localhost:8000/certificados/verify/{txid_solana}",
                 "memo_program": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
             },
             "validacao": {
                 "como_validar": "Recrie o JSON canonizado e compare o hash SHA-256",
-                "json_canonico_string": json_canonico,  # String para validação manual
+                "json_canonico_string": json_canonico,
                 "hash_esperado": certificado_hash,
                 "comando_validacao": f"printf '{json_canonico}' | shasum -a 256"
             }
@@ -112,8 +121,6 @@ async def verificar_certificado(txid: str, certificado_data: CertificadoVerifica
     """
 
     try:
-        RPC_URL = "https://api.devnet.solana.com"
-
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
@@ -127,7 +134,7 @@ async def verificar_certificado(txid: str, certificado_data: CertificadoVerifica
         json_data = json.dumps(payload).encode('utf-8')
 
         req = urllib.request.Request(
-            RPC_URL,
+            SOLANA_URL,
             data=json_data,
             headers={'Content-Type': 'application/json'}
         )
@@ -172,8 +179,8 @@ async def verificar_certificado(txid: str, certificado_data: CertificadoVerifica
             return {
                 "status": "encontrado",
                 "txid": txid,
-                "rede": "Solana Devnet",
-                "explorer_url": f"https://explorer.solana.com/tx/{txid}?cluster=devnet",
+                "rede": f"Solana {SOLANA_NETWORK.title()}",
+                "explorer_url": f"https://explorer.solana.com/tx/{txid}?cluster={SOLANA_NETWORK}",
                 "validacao": {
                     "hash_blockchain": blockchain_doc_hash,
                     "hash_gerado": generated_hash,
@@ -209,50 +216,49 @@ async def obter_informacoes_carteira():
 
     try:
         from ..services.blockchain import _registry
-        from ..wallet_config import USE_REAL_TRANSACTIONS, ACTIVE_NETWORK, WALLET_CONFIGURED, WALLET_PATH
+        
+        logger.info(f"[WALLET-INFO DEBUG] SOLANA_WALLET_PATH na rota: {SOLANA_WALLET_PATH}")
+        logger.info(f"[WALLET-INFO DEBUG] WALLET_CONFIGURED: {WALLET_CONFIGURED}")
+        logger.info(f"[WALLET-INFO DEBUG] _registry.keypair: {_registry.keypair}")
 
         if not WALLET_CONFIGURED:
+            logger.warning(f"[WALLET-INFO DEBUG] Carteira não configurada")
             return {
                 "status": "carteira_nao_configurada",
                 "mensagem": "Você precisa configurar sua própria carteira",
                 "instrucoes": {
                     "passo_1": "Crie sua carteira Solana usando: solana-keygen new",
-                    "passo_2": f"Salve o arquivo JSON em: {WALLET_PATH}",
-                    "passo_3": "Configure USE_REAL_TRANSACTIONS = True",
-                    "passo_4": "Transfira SOL para sua carteira se quiser usar mainnet",
+                    "passo_2": f"Salve o arquivo JSON em: {SOLANA_WALLET_PATH}",
+                    "passo_3": "Configure WALLET_CONFIGURED = True",
+                    "passo_4": "Transfira SOL para sua carteira",
                     "alternativa": "Ou use o sistema em modo simulação (padrão atual)"
                 },
                 "configuracao_atual": {
                     "carteira_configurada": False,
                     "transacoes_reais": USE_REAL_TRANSACTIONS,
                     "rede": ACTIVE_NETWORK,
-                    "modo": "simulacao_completa"
+                    "modo": "simulacao_completa",
+                    "wallet_path_esperado": str(SOLANA_WALLET_PATH)
                 }
             }
 
         if not _registry.keypair:
+            logger.error(f"[WALLET-INFO DEBUG] Carteira configurada mas keypair não carregado")
             return {
                 "status": "erro",
                 "mensagem": "Carteira configurada mas não carregada corretamente"
             }
 
         wallet_address = str(_registry.keypair.pubkey())
+        logger.info(f"[WALLET-INFO DEBUG] Carteira carregada: {wallet_address}")
 
         # Get balance using direct RPC call
         balance_sol = "simulacao"
         balance_lamports = "N/A"
         
-        # Debug configuration values
-        print(f"Debug - USE_REAL_TRANSACTIONS: {USE_REAL_TRANSACTIONS}")
-        print(f"Debug - WALLET_CONFIGURED: {WALLET_CONFIGURED}")
-        print(f"Debug - ACTIVE_NETWORK: {ACTIVE_NETWORK}")
-        
-        # Force balance check for debugging (remove USE_REAL_TRANSACTIONS condition temporarily)
         try:
             print(f"Consultando saldo para: {wallet_address}")
             
-            # Direct RPC call to get balance
-            RPC_URL = "https://api.devnet.solana.com"
             payload = {
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -262,15 +268,13 @@ async def obter_informacoes_carteira():
             
             json_data = json.dumps(payload).encode('utf-8')
             req = urllib.request.Request(
-                RPC_URL,
+                SOLANA_URL,
                 data=json_data,
                 headers={'Content-Type': 'application/json'}
             )
             
             with urllib.request.urlopen(req) as response:
                 balance_data = json.loads(response.read().decode('utf-8'))
-            
-            print(f"RPC Balance response: {balance_data}")
             
             if "result" in balance_data and "value" in balance_data["result"]:
                 balance_lamports = balance_data["result"]["value"]
@@ -297,7 +301,9 @@ async def obter_informacoes_carteira():
                 "debug_info": {
                     "wallet_configured": WALLET_CONFIGURED,
                     "use_real_transactions": USE_REAL_TRANSACTIONS,
-                    "active_network": ACTIVE_NETWORK
+                    "active_network": ACTIVE_NETWORK,
+                    "wallet_path": str(SOLANA_WALLET_PATH),
+                    "wallet_path_exists": Path(SOLANA_WALLET_PATH).exists()
                 }
             },
             "custos": {
@@ -305,11 +311,12 @@ async def obter_informacoes_carteira():
                 "saldo_recomendado": "0.01 SOL"
             },
             "instrucoes": {
-                "obter_sol": f"Transfira SOL da Binance para: {wallet_address}" if USE_REAL_TRANSACTIONS else "Configure sua carteira primeiro"
+                "obter_sol": f"Transfira SOL para: {wallet_address}" if USE_REAL_TRANSACTIONS else "Configure sua carteira primeiro"
             }
         }
 
     except Exception as e:
+        logger.error(f"[WALLET-INFO ERROR] {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao obter informações da carteira: {str(e)}"
