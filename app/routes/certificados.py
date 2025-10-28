@@ -6,15 +6,20 @@ import json
 import uuid
 import urllib.request
 import urllib.parse
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
+from pathlib import Path
 
 from ..services.hashing import gerar_hash_texto
 from ..services.blockchain import registrar_hash_solana, obter_info_rede
 
 # Importar config APÓS ela ter carregado o .env
-from ..config import SOLANA_NETWORK, SOLANA_URL
+from ..config import SOLANA_NETWORK, SOLANA_URL, SOLANA_WALLET_PATH
+from ..wallet_config import USE_REAL_TRANSACTIONS, ACTIVE_NETWORK, WALLET_CONFIGURED
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/certificados", tags=["certificados"])
 
@@ -211,15 +216,19 @@ async def obter_informacoes_carteira():
 
     try:
         from ..services.blockchain import _registry
-        from ..wallet_config import USE_REAL_TRANSACTIONS, ACTIVE_NETWORK, WALLET_CONFIGURED, WALLET_PATH
+        
+        logger.info(f"[WALLET-INFO DEBUG] SOLANA_WALLET_PATH na rota: {SOLANA_WALLET_PATH}")
+        logger.info(f"[WALLET-INFO DEBUG] WALLET_CONFIGURED: {WALLET_CONFIGURED}")
+        logger.info(f"[WALLET-INFO DEBUG] _registry.keypair: {_registry.keypair}")
 
         if not WALLET_CONFIGURED:
+            logger.warning(f"[WALLET-INFO DEBUG] Carteira não configurada")
             return {
                 "status": "carteira_nao_configurada",
                 "mensagem": "Você precisa configurar sua própria carteira",
                 "instrucoes": {
                     "passo_1": "Crie sua carteira Solana usando: solana-keygen new",
-                    "passo_2": f"Salve o arquivo JSON em: {WALLET_PATH}",
+                    "passo_2": f"Salve o arquivo JSON em: {SOLANA_WALLET_PATH}",
                     "passo_3": "Configure WALLET_CONFIGURED = True",
                     "passo_4": "Transfira SOL para sua carteira",
                     "alternativa": "Ou use o sistema em modo simulação (padrão atual)"
@@ -228,17 +237,20 @@ async def obter_informacoes_carteira():
                     "carteira_configurada": False,
                     "transacoes_reais": USE_REAL_TRANSACTIONS,
                     "rede": ACTIVE_NETWORK,
-                    "modo": "simulacao_completa"
+                    "modo": "simulacao_completa",
+                    "wallet_path_esperado": str(SOLANA_WALLET_PATH)
                 }
             }
 
         if not _registry.keypair:
+            logger.error(f"[WALLET-INFO DEBUG] Carteira configurada mas keypair não carregado")
             return {
                 "status": "erro",
                 "mensagem": "Carteira configurada mas não carregada corretamente"
             }
 
         wallet_address = str(_registry.keypair.pubkey())
+        logger.info(f"[WALLET-INFO DEBUG] Carteira carregada: {wallet_address}")
 
         # Get balance using direct RPC call
         balance_sol = "simulacao"
@@ -289,7 +301,9 @@ async def obter_informacoes_carteira():
                 "debug_info": {
                     "wallet_configured": WALLET_CONFIGURED,
                     "use_real_transactions": USE_REAL_TRANSACTIONS,
-                    "active_network": ACTIVE_NETWORK
+                    "active_network": ACTIVE_NETWORK,
+                    "wallet_path": str(SOLANA_WALLET_PATH),
+                    "wallet_path_exists": Path(SOLANA_WALLET_PATH).exists()
                 }
             },
             "custos": {
@@ -302,6 +316,7 @@ async def obter_informacoes_carteira():
         }
 
     except Exception as e:
+        logger.error(f"[WALLET-INFO ERROR] {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao obter informações da carteira: {str(e)}"

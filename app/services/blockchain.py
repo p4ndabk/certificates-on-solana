@@ -6,15 +6,25 @@ import time
 import json
 import logging
 from typing import Optional
+from pathlib import Path
 
 # Importar config PRIMEIRO (que já carregou o .env)
 from ..config import SOLANA_NETWORK, SOLANA_URL, SOLANA_WALLET_PATH
 from ..wallet_config import (
-    USE_REAL_TRANSACTIONS, WALLET_PATH, RPC_URL, ACTIVE_NETWORK, 
+    USE_REAL_TRANSACTIONS, RPC_URL, ACTIVE_NETWORK, 
     WALLET_CONFIGURED, REQUIRE_MANUAL_SETUP
 )
 
 logger = logging.getLogger(__name__)
+
+# DEBUG: Log das configurações carregadas
+logger.info(f"[BLOCKCHAIN DEBUG] SOLANA_NETWORK (config): {SOLANA_NETWORK}")
+logger.info(f"[BLOCKCHAIN DEBUG] SOLANA_URL (config): {SOLANA_URL}")
+logger.info(f"[BLOCKCHAIN DEBUG] SOLANA_WALLET_PATH (config): {SOLANA_WALLET_PATH}")
+logger.info(f"[BLOCKCHAIN DEBUG] ACTIVE_NETWORK (wallet_config): {ACTIVE_NETWORK}")
+logger.info(f"[BLOCKCHAIN DEBUG] RPC_URL (wallet_config): {RPC_URL}")
+logger.info(f"[BLOCKCHAIN DEBUG] WALLET_CONFIGURED (wallet_config): {WALLET_CONFIGURED}")
+
 
 try:
     from solana.rpc.api import Client
@@ -45,6 +55,8 @@ class SolanaCertificateRegistry:
     
     def _initialize_client(self):
         """Inicializa cliente e carteira conforme configuração"""
+        logger.info(f"[INIT DEBUG] Iniciando com network={self.network}, rpc_url={self.rpc_url}")
+        
         if REQUIRE_MANUAL_SETUP and not WALLET_CONFIGURED:
             logger.warning("Carteira não configurada - usuário deve configurar manualmente")
             return
@@ -56,21 +68,27 @@ class SolanaCertificateRegistry:
         logger.info(f"Conectando à Solana {self.network.upper()}")
         self.client = Client(self.rpc_url)
         
-        if WALLET_CONFIGURED and WALLET_PATH.exists():
-            self.keypair = self._load_wallet()
+        wallet_path = Path(SOLANA_WALLET_PATH)
+        logger.info(f"[WALLET DEBUG] WALLET_CONFIGURED={WALLET_CONFIGURED}, wallet_path={wallet_path}, exists={wallet_path.exists()}")
+        
+        if WALLET_CONFIGURED and wallet_path.exists():
+            logger.info(f"[WALLET DEBUG] Tentando carregar carteira de {wallet_path}")
+            self.keypair = self._load_wallet(wallet_path)
         else:
+            logger.warning(f"[WALLET DEBUG] Criando carteira temporária. WALLET_CONFIGURED={WALLET_CONFIGURED}, path_exists={wallet_path.exists()}")
             self.keypair = Keypair()
             logger.info(f"Criando carteira temporária: {str(self.keypair.pubkey())}")
     
-    def _load_wallet(self):
+    def _load_wallet(self, wallet_path: Path):
         """Carrega carteira existente do arquivo"""
         try:
-            logger.info(f"Carregando carteira de {WALLET_PATH}")
-            with open(WALLET_PATH, 'r') as f:
+            logger.info(f"[LOAD_WALLET DEBUG] Carregando carteira de {wallet_path}")
+            with open(wallet_path, 'r') as f:
                 keypair_data = json.load(f)
+                logger.info(f"[LOAD_WALLET DEBUG] Carteira carregada com sucesso")
                 return Keypair.from_bytes(bytes(keypair_data))
         except Exception as e:
-            logger.error(f"Erro ao carregar carteira: {e}")
+            logger.error(f"[LOAD_WALLET ERROR] Erro ao carregar carteira: {e}")
             return None
         
     def mask_name(self, nome: str) -> str:
