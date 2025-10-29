@@ -20,11 +20,21 @@ async def api_key_middleware(request: Request, call_next: Callable) -> Response:
         Response: Resposta HTTP
     """
     
+    # Rotas que não precisam de autenticação
+    public_routes = ["/health", "/docs", "/redoc", "/openapi.json"]
+    
+    # Verificar se é uma rota pública
+    if request.url.path in public_routes:
+        return await call_next(request)
+    
+    # Pegar API key válida do ambiente
     valid_api_key = os.getenv("API_KEY")
     
     if not valid_api_key:
+        # Se não há API key configurada, permite acesso (modo desenvolvimento)
         return await call_next(request)
     
+    # Verificar se a requisição tem o header x-api-key
     provided_api_key = request.headers.get("x-api-key")
     
     if not provided_api_key:
@@ -39,4 +49,5 @@ async def api_key_middleware(request: Request, call_next: Callable) -> Response:
             content={"detail": "Invalid API Key"}
         )
     
+    # API key válida, continuar com a requisição
     return await call_next(request)

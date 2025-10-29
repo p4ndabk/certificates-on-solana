@@ -36,7 +36,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+    
 # Incluir rotas
 app.include_router(certificados_router)
 
