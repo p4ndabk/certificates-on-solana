@@ -7,6 +7,7 @@ import json
 import logging
 from typing import Optional
 from pathlib import Path
+from datetime import datetime
 
 # Importar config PRIMEIRO (que já carregou o .env)
 from ..config import SOLANA_NETWORK, SOLANA_URL, SOLANA_WALLET_PATH
@@ -118,7 +119,7 @@ class SolanaCertificateRegistry:
             "name": self.mask_name(nome_participante).lower(),
             "email": self.mask_email(email_participante).lower(),
             "evento": evento.lower(),
-            "timestamp": int(time.time()),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "doc_hash": certificado_hash.lower(),
             "network": self.network,
             "emissor": "Sistema de Certificados Blockchain"            

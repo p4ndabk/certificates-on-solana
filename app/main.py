@@ -13,6 +13,9 @@ from app.routes.certificados import router as certificados_router
 # Configurações
 from app.config import APP_NAME, APP_VERSION, APP_DESCRIPTION
 
+# Middleware de autenticação
+from app.middleware import api_key_middleware
+
 # Criar instância da aplicação FastAPI
 app = FastAPI(
     title=APP_NAME,
@@ -22,6 +25,9 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Registrar middleware de API Key (ANTES dos outros middlewares)
+app.middleware("http")(api_key_middleware)
+
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
@@ -30,7 +36,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+    
 # Incluir rotas
 app.include_router(certificados_router)
 

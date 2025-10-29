@@ -62,7 +62,7 @@ async def registrar_certificado(request: CertificadoRequest):
             "name": request.name.lower(),
             "email": request.email.lower(),
             "certificate_code": request.certificate_code.lower(),
-            "time": current_time.isoformat()
+            "time": current_time.strftime("%Y-%m-%d %H:%M:%S")
         }
 
         json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
@@ -78,12 +78,12 @@ async def registrar_certificado(request: CertificadoRequest):
                 "name": request.name,
                 "email": request.email,
                 "uuid": certificate_uuid,
-                "time": current_time.isoformat(),
+                "time": current_time.strftime("%Y-%m-%d %H:%M:%S"),
                 "json_canonico": certificate_data,
                 "hash_sha256": certificado_hash,
                 "txid_solana": txid_solana,
                 "network": SOLANA_NETWORK,
-                "timestamp": current_time.isoformat(),
+                "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
                 "timestamp_unix": int(current_time.timestamp())
             },
             "blockchain": {
@@ -145,6 +145,7 @@ async def verificar_certificado(txid: str, certificado_data: CertificadoVerifica
         if "result" in data and data["result"]:
             transaction_result = data["result"]
 
+            memo_data_extraido = {} 
             blockchain_doc_hash = None
             if "meta" in transaction_result and "logMessages" in transaction_result["meta"]:
                 for log_message in transaction_result["meta"]["logMessages"]:
@@ -157,10 +158,25 @@ async def verificar_certificado(txid: str, certificado_data: CertificadoVerifica
                                 memo_json_str = memo_json_str.replace('\\"', '"')
                                 memo_data = json.loads(memo_json_str)
                                 blockchain_doc_hash = memo_data.get("doc_hash")
+
+                                # extact memo metadata
+                                metadata_memo = {
+                                    "version": memo_data.get("version"),
+                                    "tipo": memo_data.get("tipo"),
+                                    "code": memo_data.get("code"),
+                                    "name": memo_data.get("name"),
+                                    "email": memo_data.get("email"),
+                                    "evento": memo_data.get("evento"),
+                                    "timestamp": memo_data.get("timestamp"),
+                                    "doc_hash": memo_data.get("doc_hash"),
+                                    "network": memo_data.get("network"),
+                                    "emissor": memo_data.get("emissor")
+                                }
+                                
                                 break
                         except (json.JSONDecodeError, KeyError):
                             continue
-
+                        
             # Generate hash from provided certificate data
             certificate_dict = {
                 "event": certificado_data.event.lower(),
@@ -181,6 +197,7 @@ async def verificar_certificado(txid: str, certificado_data: CertificadoVerifica
                 "txid": txid,
                 "rede": f"Solana {SOLANA_NETWORK.title()}",
                 "explorer_url": f"https://explorer.solana.com/tx/{txid}?cluster={SOLANA_NETWORK}",
+                "metadata_memo": metadata_memo,
                 "validacao": {
                     "hash_blockchain": blockchain_doc_hash,
                     "hash_gerado": generated_hash,
