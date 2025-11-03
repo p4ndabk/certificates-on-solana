@@ -68,7 +68,27 @@ async def registrar_certificado(request: CertificadoRequest):
         json_canonico = json.dumps(certificate_data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
         certificado_hash = gerar_hash_texto(json_canonico)
 
-        txid_solana = await registrar_hash_solana(certificado_hash, request.name, request.event, request.certificate_code, request.email)
+        try:
+            txid_solana = await registrar_hash_solana(certificado_hash, request.name, request.event, request.certificate_code, request.email)
+            
+            if not txid_solana:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Falha ao obter TXID da blockchain"
+                )
+                
+        except Exception as blockchain_error:
+            logger.error(f"Erro na blockchain: {blockchain_error}")
+            raise HTTPException(
+                status_code=500,  # Service Unavailable
+                detail={
+                    "error": "Falha ao registrar certificado na blockchain",
+                    "message": str(blockchain_error),
+                    "certificate_data": certificate_data,
+                    "hash_sha256": certificado_hash
+                }
+            )
+        
         print(f"Certificado hash: {certificado_hash}")
         
         return {
@@ -100,10 +120,15 @@ async def registrar_certificado(request: CertificadoRequest):
             }
         }
 
+    except HTTPException:
+        # Re-raise HTTPExceptions (blockchain errors)
+        raise
     except Exception as e:
+        # Catch any other unexpected errors
+        logger.error(f"Erro inesperado ao registrar certificado: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Erro ao registrar certificado: {str(e)}"
+            detail=f"Erro interno do servidor: {str(e)}"
         )
 
 
