@@ -206,16 +206,28 @@ class SolanaCertificateRegistry:
             
             transaction = self._create_transaction(memo_data)
             
+            if not transaction:
+                raise ValueError("Falha ao criar transação Solana")
+            
             # Envia transação
             logger.info(f"Enviando transação para Solana {self.network}...")
             response = self.client.send_transaction(transaction)
+            
+            if not response or not response.value:
+                raise ValueError("Falha ao enviar transação para a blockchain")
+                
             tx_signature = str(response.value)
+            
+            if not tx_signature or len(tx_signature) < 32:
+                raise ValueError("TXID inválido retornado pela blockchain")
             
             logger.info(f"Certificado registrado - TXID: {tx_signature}")
             return tx_signature
             
         except Exception as e:
             logger.error(f"Erro no registro: {e}")
+            # Re-raise a exceção para ser capturada na rota
+            raise Exception(f"Falha ao registrar certificado na blockchain: {str(e)}")
 
 
 # Instância global
